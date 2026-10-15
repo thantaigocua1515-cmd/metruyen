@@ -169,6 +169,99 @@ export default function Navbar() {
     );
   }
 
+  /* ---------- Variant tinh-ha: navbar blur, wordmark serif ---------- */
+  if (template === 'tinh-ha') {
+    return (
+      <header
+        className="sticky top-0 z-40 border-b backdrop-blur-xl"
+        style={{
+          borderColor: 'var(--border, color-mix(in srgb, var(--ink) 12%, transparent))',
+          background: 'color-mix(in srgb, var(--page-bg) 82%, transparent)',
+        }}
+      >
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-2.5 sm:gap-4 sm:px-6">
+          <Link to="/" className="flex shrink-0 items-center gap-2.5">
+            <span
+              className="text-2xl font-semibold tracking-wide"
+              style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)' }}
+            >
+              Mê <span style={{ color: 'var(--brand)' }}>Truyện</span>
+            </span>
+          </Link>
+
+          <form onSubmit={submitSearch} className="hidden flex-1 sm:block">
+            <input
+              ref={inputRef}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Tìm truyện, tác giả..."
+              aria-label="Tìm truyện"
+              className="min-h-[44px] w-full rounded-full bg-[var(--card-bg)] px-5 text-sm outline-none transition"
+              style={{ border: '1px solid var(--border, color-mix(in srgb, var(--ink) 18%, transparent))', color: 'var(--ink)' }}
+            />
+          </form>
+
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            {themeBtn}
+
+            {user && profile ? (
+              <div className="relative">
+                {menuOpen && (
+                  <div className="fixed inset-0 z-40 cursor-default" onClick={() => setMenuOpen(false)} />
+                )}
+                <button
+                  onClick={() => setMenuOpen((o) => !o)}
+                  className="min-h-[44px] min-w-[44px] rounded-full transition hover:ring-2"
+                  style={{ ['--tw-ring-color' as string]: 'var(--brand)' } as CSSProperties}
+                  title={profile.username}
+                  aria-label="Menu tài khoản"
+                >
+                  <AvatarWithFrame
+                    src={profile.avatar_url}
+                    frame={frame}
+                    treasure={treasure}
+                    size={38}
+                    username={profile.username}
+                  />
+                </button>
+                {menuOpen && dropdown}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/auth"
+                  className="inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-semibold transition hover:opacity-70"
+                  style={{ color: 'var(--brand)' }}
+                >
+                  Đăng nhập
+                </Link>
+                <Link
+                  to="/auth?mode=register"
+                  className="inline-flex min-h-[44px] items-center rounded-full px-5 text-sm font-bold text-white transition hover:opacity-90 dark:text-stone-950"
+                  style={{ background: 'var(--brand)' }}
+                >
+                  Đăng ký
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ô tìm kiếm cho mobile */}
+        <form onSubmit={submitSearch} className="px-4 pb-2.5 sm:hidden">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Tìm truyện, tác giả..."
+            aria-label="Tìm truyện"
+            className="min-h-[44px] w-full rounded-full bg-[var(--card-bg)] px-5 text-sm outline-none transition"
+            style={{ border: '1px solid var(--border, color-mix(in srgb, var(--ink) 18%, transparent))', color: 'var(--ink)' }}
+          />
+        </form>
+      </header>
+    );
+  }
+
   /* ---------- Các template còn lại: navbar hiện tại, ăn theo brand var ---------- */
   return (
     <header

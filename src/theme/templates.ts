@@ -46,6 +46,12 @@ export const TEMPLATES: TemplateDef[] = [
     desc: 'Minimal: xám đá trung tính, ít trang trí, tập trung nội dung.',
     swatches: ['#334155', '#94a3b8', '#f8fafc'],
   },
+  {
+    id: 'tinh-ha',
+    name: 'Tinh Hà',
+    desc: 'Thư các điện ảnh: hero cinematic, chữ serif sang trọng.',
+    swatches: ['#B45309', '#FFFBEB', '#0A0E17'],
+  },
 ];
 
 export const DEFAULT_TEMPLATE = 'thu-cac';

@@ -62,8 +62,8 @@ Vì dùng HashRouter nên không cần cấu hình rewrite gì thêm — mở l�
   (đọc 60 giây thật mới cộng 60 giây — tab ẩn thì không tính).
 - **Linh thạch:** đọc 5 phút được +1 linh thạch, dùng mua khung/pháp bảo ở
   **Tàng Bảo Các**, cất trong **Túi Trữ Vật**.
-- **5 template giao diện** (xem mục 6): Thư Các Tu Tiên (mặc định), TruyenC Hiện
-  Đại, Dạ Huyền Ảo, Cổ Phong, Tối Giản — đổi trong admin, áp dụng realtime.
+- **6 template giao diện** (xem mục 6): Thư Các Tu Tiên (mặc định), TruyenC Hiện
+  Đại, Dạ Huyền Ảo, Cổ Phong, Tối Giản, Tinh Hà — đổi trong admin, áp dụng realtime.
 - **Admin panel** (chỉ hiện với role admin): Tổng quan, Người dùng (sửa role,
   cộng/trừ giờ đọc & linh thạch, xóa), Nguồn API (thêm/sửa/bật-tắt link
   openapi + nút Kiểm tra), **Đồng bộ** (kéo truyện từ API về database của
@@ -86,7 +86,7 @@ src/lib/library.ts        đọc truyện đã đồng bộ từ DB (ưu tiên D
 src/lib/tuvi.ts           thang 15 cảnh giới tu vi
 src/lib/genres.ts         đoán thể loại bằng keyword (heuristic — API chưa có trường này)
 src/lib/useNovels.ts      hook tải truyện dùng chung (Home/Search/Genres) — ưu tiên DB
-src/theme/templates.ts    registry 5 template giao diện
+src/theme/templates.ts    registry 6 template giao diện
 src/context/             AuthContext (username/password), ThemeContext (light/dark),
                          TemplateContext (template hiện tại, realtime qua site_settings)
 src/components/          Navbar, BottomTabBar, AvatarWithFrame, NovelCard, ReaderView,
@@ -97,7 +97,7 @@ src/pages/               Home, NovelDetail, Reader, Bookshelf, Profile, UserProf
 
 ## 6. Template giao diện 🎨
 
-Web có 5 bộ skin, đổi trong **Quản trị → tab 🎨 Giao diện** (chỉ admin).
+Web có 6 bộ skin, đổi trong **Quản trị → tab 🎨 Giao diện** (chỉ admin).
 Đổi là áp dụng **ngay lập tức cho toàn site** (lưu ở bảng `site_settings`,
 realtime tới mọi máy đang mở web):
 
@@ -108,6 +108,7 @@ realtime tới mọi máy đang mở web):
 | `da-huyen-ao` | Dạ Huyền Ảo | Dark fantasy nền đêm tím |
 | `co-phong` | Cổ Phong | Giấy dó, đỏ son + vàng đồng, serif |
 | `toi-gian` | Tối Giản | Minimal xám đá, tập trung nội dung |
+| `tinh-ha` | Tinh Hà | Thư các điện ảnh: hero cinematic, chữ serif Cormorant Garamond |
 
 - Nút Light/Dark vẫn hoạt động với mọi template.
 - Template `truyenc` có thêm trang **Tìm kiếm** (`/search`) và **Thể loại**
