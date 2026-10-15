@@ -73,6 +73,7 @@ function OverviewTab() {
     ['🔗 Nguồn API', String(stats.sources)],
     ['⚔️ Vật phẩm', String(stats.items)],
   ];
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {cells.map(([label, value]) => (
@@ -1000,6 +1001,27 @@ function ThemeTab() {
 }
 
 /* ---------------- Đồng bộ truyện từ API về database ---------------- */
+interface SyncJobRow {
+  id: string;
+  kind: string;
+  source_id: string | null;
+  novel_key: string | null;
+  status: string;
+  total: number;
+  done: number;
+  skipped: number;
+  error: string | null;
+  heartbeat_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const JOB_KIND_LABEL: Record<string, string> = {
+  'sync-novel': 'Đồng bộ chương',
+  'sync-all': 'Đồng bộ tất cả',
+  'check-updates': 'Kiểm tra cập nhật',
+};
+
 function SyncTab() {
   const [sources, setSources] = useState<ApiSourceRow[]>([]);
   const [sourceId, setSourceId] = useState('');
@@ -1009,6 +1031,24 @@ function SyncTab() {
   const [progress, setProgress] = useState<Record<string, string>>({});
   const [summary, setSummary] = useState<string | null>(null);
   const stopRef = useRef(false);
+
+  /* ---------- Đồng bộ nền (Edge Function sync-worker) ---------- */
+  const [jobs, setJobs] = useState<SyncJobRow[]>([]);
+  const [bgBusy, setBgBusy] = useState(false);
+
+  const loadJobs = async () => {
+    try {
+      const sb = getSupabase();
+      const { data } = await sb
+        .from('sync_jobs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      setJobs((data ?? []) as SyncJobRow[]);
+    } catch {
+      setJobs([]);
+    }
+  };
 
   const loadSources = async () => {
     const sb = getSupabase();
@@ -1030,6 +1070,23 @@ function SyncTab() {
   useEffect(() => {
     if (sourceId) void loadNovels(sourceId);
   }, [sourceId]);
+  useEffect(() => {
+    void loadJobs();
+    const sb = getSupabase();
+    const ch = sb
+      .channel('sync-jobs-admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sync_jobs' }, (payload) => {
+        void loadJobs();
+        const row = payload.new as SyncJobRow | undefined;
+        if ((row?.status === 'done' || row?.status === 'error') && row?.source_id) {
+          void loadNovels(row.source_id);
+        }
+      })
+      .subscribe();
+    return () => {
+      void sb.removeChannel(ch);
+    };
+  }, []);
 
   const src = sources.find((s) => s.id === sourceId) ?? null;
   const fmtDate = (s: string | null) =>
@@ -1111,6 +1168,104 @@ function SyncTab() {
     }
   };
 
+  /* ----- Chạy nền qua Edge Function sync-worker (tắt tab vẫn chạy) ----- */
+  const runInBackground = async (
+    kind: 'sync-all' | 'check-updates' | 'sync-novel',
+    novelKey?: string,
+  ) => {
+    if (!src || bgBusy) return;
+    setBgBusy(true);
+    try {
+      const sb = getSupabase();
+      const { data, error } = await sb
+        .from('sync_jobs')
+        .insert({ kind, source_id: src.id, novel_key: novelKey ?? null, status: 'pending' })
+        .select('id')
+        .single();
+      if (error || !data) throw new Error(`Tạo job thất bại: ${error?.message ?? '?'}`);
+      const jobId = (data as { id: string }).id;
+      const { error: fnErr } = await sb.functions.invoke('sync-worker', {
+        body: { job_id: jobId },
+      });
+      if (fnErr) throw fnErr;
+      setSummary('▶ Đã bắt đầu chạy nền — tắt tab thoải mái, tiến trình cập nhật tự động bên dưới.');
+      await loadJobs();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Lỗi không xác định.';
+      setSummary(
+        `❌ Chạy nền thất bại: ${msg} — có thể Edge Function 'sync-worker' chưa được deploy. Xem README mục "Đồng bộ nền".`,
+      );
+    } finally {
+      setBgBusy(false);
+    }
+  };
+
+  const resumeJob = async (job: SyncJobRow) => {
+    try {
+      const sb = getSupabase();
+      const { error } = await sb.functions.invoke('sync-worker', { body: { job_id: job.id } });
+      if (error) throw error;
+      setSummary('▶ Đã gửi lệnh tiếp tục job.');
+    } catch (e) {
+      setSummary(
+        `❌ Không tiếp tục được: ${e instanceof Error ? e.message : 'lỗi'} — kiểm tra Edge Function 'sync-worker' đã deploy chưa (README mục "Đồng bộ nền").`,
+      );
+    }
+  };
+
+  const cancelJob = async (job: SyncJobRow) => {
+    try {
+      const sb = getSupabase();
+      const { error } = await sb.from('sync_jobs').update({ status: 'cancelled' }).eq('id', job.id);
+      if (error) throw error;
+      await loadJobs();
+    } catch {
+      /* bỏ qua */
+    }
+  };
+
+  const jobStalled = (j: SyncJobRow) => {
+    if (j.status !== 'running') return false;
+    const hb = j.heartbeat_at ?? j.updated_at;
+    return Date.now() - new Date(hb).getTime() > 10 * 60 * 1000;
+  };
+
+  const timeAgo = (iso: string | null) => {
+    if (!iso) return '—';
+    const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return `${s} giây trước`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} phút trước`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} giờ trước`;
+    return `${Math.floor(h / 24)} ngày trước`;
+  };
+
+  const jobTitle = (j: SyncJobRow) => {
+    const kindLabel = JOB_KIND_LABEL[j.kind] ?? j.kind;
+    const novel = j.novel_key ? novels.find((n) => n.id === j.novel_key) : null;
+    return novel ? `${kindLabel}: ${novel.title}` : kindLabel;
+  };
+
+  const statusBadge = (s: string) => {
+    const cls: Record<string, string> = {
+      pending: 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200',
+      running: 'animate-pulse bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      done: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      error: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      cancelled: 'bg-stone-200 text-stone-500 dark:bg-stone-700 dark:text-stone-400',
+    };
+    const label =
+      { pending: 'Chờ', running: 'Đang chạy', done: 'Xong', error: 'Lỗi', cancelled: 'Đã hủy' }[
+        s
+      ] ?? s;
+    return (
+      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls[s] ?? cls.pending}`}>
+        {label}
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className={`${card} flex flex-wrap items-center gap-2`}>
@@ -1131,8 +1286,24 @@ function SyncTab() {
         <button onClick={() => void doSyncList()} disabled={busy || !src} className={btnPrimary}>
           {busy ? 'Đang chạy...' : '⬇ Đồng bộ danh sách truyện'}
         </button>
+        <button
+          onClick={() => void runInBackground('sync-all')}
+          disabled={bgBusy || !src}
+          className={btnGhost}
+          title="Chạy trên server: đồng bộ danh sách + TẤT CẢ chương. Tắt tab vẫn chạy."
+        >
+          {bgBusy ? '...' : '▶ Chạy nền: tất cả'}
+        </button>
         <button onClick={() => void doCheck()} disabled={busy || !src} className={btnGhost}>
           {busy ? 'Đang chạy...' : '🔍 Kiểm tra cập nhật'}
+        </button>
+        <button
+          onClick={() => void runInBackground('check-updates')}
+          disabled={bgBusy || !src}
+          className={btnGhost}
+          title="Chạy trên server: chỉ lấy truyện mới / chương mới. Tắt tab vẫn chạy."
+        >
+          {bgBusy ? '...' : '▶ Chạy nền'}
         </button>
       </div>
 
@@ -1149,7 +1320,7 @@ function SyncTab() {
         <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
           Bấm "Đồng bộ chương" để tải nội dung từng chương về database — tự bỏ qua chương đã
           có, chương lỗi sẽ được bỏ qua và tiếp tục. Truyện dài 1000+ chương có thể mất vài
-          phút, cứ để tab mở.
+          phút: dùng nút "▶ Nền" để chạy trên server, tắt tab vẫn xong.
         </p>
         <div className="mt-3 space-y-2">
           {novels.map((n) => {
@@ -1171,13 +1342,23 @@ function SyncTab() {
                       ⏹ Dừng
                     </button>
                   ) : (
-                    <button
-                      onClick={() => void doSyncChapters(n)}
-                      disabled={busyNovel !== null}
-                      className={btnPrimary}
-                    >
-                      ⬇ Đồng bộ chương
-                    </button>
+                    <>
+                      <button
+                        onClick={() => void doSyncChapters(n)}
+                        disabled={busyNovel !== null}
+                        className={btnPrimary}
+                      >
+                        ⬇ Đồng bộ chương
+                      </button>
+                      <button
+                        onClick={() => void runInBackground('sync-novel', n.id)}
+                        disabled={busyNovel !== null || bgBusy}
+                        className={btnGhost}
+                        title="Chạy trên server — tắt tab vẫn chạy."
+                      >
+                        ▶ Nền
+                      </button>
+                    </>
                   )}
                 </div>
                 <div className="mt-2 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
@@ -1200,6 +1381,71 @@ function SyncTab() {
           {novels.length === 0 && (
             <p className="py-6 text-center text-sm italic text-stone-500 dark:text-stone-400">
               Chưa có truyện nào trong database. Bấm "⬇ Đồng bộ danh sách truyện" để bắt đầu.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className={card}>
+        <h3 className="font-bold text-stone-900 dark:text-stone-100">
+          ⚙️ Tiến trình nền ({jobs.length})
+        </h3>
+        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+          Job chạy trên server (Edge Function) — tắt tab trình duyệt vẫn tiếp tục. Tiến trình cập
+          nhật tự động theo thời gian thực.
+        </p>
+        <div className="mt-3 space-y-2">
+          {jobs.map((j) => {
+            const pct = j.total > 0 ? Math.round((Math.min(j.done, j.total) / j.total) * 100) : 0;
+            const stalled = jobStalled(j);
+            return (
+              <div
+                key={j.id}
+                className="rounded-xl border border-amber-900/10 p-3 dark:border-amber-100/10"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="min-w-0 flex-1 truncate font-semibold text-stone-900 dark:text-stone-100">
+                    {jobTitle(j)}
+                  </p>
+                  {statusBadge(j.status)}
+                  {stalled && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                      ⏳ Đứng quá 10 phút
+                    </span>
+                  )}
+                  {(j.status === 'running' || j.status === 'pending') && (
+                    <button onClick={() => void cancelJob(j)} className={btnGhost}>
+                      ✕ Hủy
+                    </button>
+                  )}
+                  {(j.status === 'error' || stalled) && (
+                    <button onClick={() => void resumeJob(j)} className={btnPrimary}>
+                      ▶ Tiếp tục
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-700">
+                    <div
+                      className="h-full rounded-full bg-blue-600 transition-all dark:bg-blue-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="whitespace-nowrap">
+                    {j.done}/{j.total}
+                    {j.skipped > 0 ? ` · bỏ qua ${j.skipped}` : ''}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
+                  Cập nhật: {timeAgo(j.heartbeat_at ?? j.updated_at)}
+                  {j.error ? ` · ❌ ${j.error}` : ''}
+                </p>
+              </div>
+            );
+          })}
+          {jobs.length === 0 && (
+            <p className="py-4 text-center text-sm italic text-stone-500 dark:text-stone-400">
+              Chưa có job nền nào. Bấm "▶ Chạy nền" ở trên để bắt đầu.
             </p>
           )}
         </div>
