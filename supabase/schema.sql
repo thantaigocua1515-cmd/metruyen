@@ -303,6 +303,12 @@ create policy inventory_all_own on public.inventory_items
   using (auth.uid() = user_id or public.is_admin())
   with check (auth.uid() = user_id or public.is_admin());
 
+-- inventory_items: ai cũng xem được vật phẩm ĐANG TRANG BỊ
+-- (hiển thị khung/pháp bảo trên bảng xếp hạng + trang cá nhân người khác)
+drop policy if exists inventory_select_equipped_public on public.inventory_items;
+create policy inventory_select_equipped_public on public.inventory_items
+  for select using (equipped = true);
+
 -- character_defaults: public đọc, admin ghi
 drop policy if exists defaults_select_all on public.character_defaults;
 create policy defaults_select_all on public.character_defaults

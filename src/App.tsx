@@ -12,6 +12,7 @@ import Profile from './pages/Profile';
 import Inventory from './components/Inventory';
 import Treasury from './components/Treasury';
 import Leaderboard from './components/Leaderboard';
+import UserProfile from './pages/UserProfile';
 import Admin from './pages/Admin';
 import Auth from './pages/Auth';
 
@@ -75,6 +76,7 @@ export default function App() {
                 <Route path="/read/:sourceId/:novelId/:chapter" element={<Reader />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
+                <Route path="/user/:userId" element={<UserProfile />} />
                 <Route
                   path="/bookshelf"
                   element={
