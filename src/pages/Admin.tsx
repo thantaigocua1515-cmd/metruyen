@@ -23,9 +23,9 @@ const card =
 const inputCls =
   'w-full rounded-xl border border-amber-900/20 bg-white px-3 py-1.5 text-sm outline-none focus:border-amber-500 dark:border-amber-100/15 dark:bg-stone-800 dark:text-stone-100';
 const btnPrimary =
-  'rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500';
+  'rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-amber-600 dark:hover:bg-amber-500';
 const btnGhost =
-  'rounded-full border border-amber-900/20 px-4 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-100/15 dark:text-amber-300 dark:hover:bg-stone-800';
+  'rounded-full border border-amber-900/20 px-4 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-amber-100/15 dark:text-amber-300 dark:hover:bg-stone-800';
 
 /* ---------------- Tổng quan ---------------- */
 function OverviewTab() {
@@ -575,8 +575,12 @@ function ItemsTab() {
   };
 
   const upload = async () => {
-    if (!file || !name.trim()) {
-      alert('Nhập tên và chọn ảnh.');
+    if (!name.trim()) {
+      alert('Nhập tên vật phẩm đã nhé.');
+      return;
+    }
+    if (!file) {
+      alert('Bạn chưa chọn ảnh — bấm nút "📁 Chọn ảnh" trước nhé.');
       return;
     }
     setUploading(true);
@@ -605,7 +609,14 @@ function ItemsTab() {
       void load();
       alert('Đã thêm vật phẩm!');
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Upload thất bại.');
+      const msg = e instanceof Error ? e.message : 'Upload thất bại.';
+      if (/bucket not found/i.test(msg)) {
+        alert(
+          'Bucket "frames" chưa có trong Supabase.\nBạn mở Supabase → SQL Editor, chạy lại đoạn "Storage buckets" trong file supabase/schema.sql rồi thử lại nhé.',
+        );
+      } else {
+        alert(msg);
+      }
     } finally {
       setUploading(false);
     }
@@ -634,13 +645,22 @@ function ItemsTab() {
             inputMode="numeric"
             className={inputCls}
           />
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-            className="text-sm text-stone-500"
-          />
-          <button onClick={() => void upload()} disabled={uploading || !file} className={btnPrimary}>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-amber-700/40 px-4 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-300 dark:hover:bg-stone-800">
+            📁 {file ? 'Đổi ảnh khác' : 'Chọn ảnh'}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+              className="hidden"
+            />
+          </label>
+          {file && (
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              Đã chọn: <span className="font-semibold">{file.name}</span> (
+              {Math.round(file.size / 1024)} KB)
+            </p>
+          )}
+          <button onClick={() => void upload()} disabled={uploading} className={btnPrimary}>
             {uploading ? 'Đang tải lên...' : '⬆ Tải lên'}
           </button>
         </div>
