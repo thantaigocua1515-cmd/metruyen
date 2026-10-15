@@ -462,3 +462,30 @@ create policy gemini_keys_admin_all on public.gemini_keys
   using (public.is_admin())
   with check (public.is_admin());
 grant all on public.gemini_keys to authenticated;
+
+-- 22. sync_jobs: job đồng bộ nền (Edge Function sync-worker) ----------------------
+-- Chỉ admin đọc/ghi — KHÔNG có policy public.
+create table if not exists public.sync_jobs (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null,
+  source_id text,
+  novel_key text,
+  status text not null default 'pending', -- pending|running|done|error|cancelled
+  total int not null default 0,
+  done int not null default 0,
+  skipped int not null default 0,
+  error text,
+  heartbeat_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.sync_jobs enable row level security;
+drop policy if exists sync_jobs_admin_all on public.sync_jobs;
+create policy sync_jobs_admin_all on public.sync_jobs
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+grant all on public.sync_jobs to authenticated;
+
+-- realtime để admin xem tiến trình live
+alter publication supabase_realtime add table public.sync_jobs;

@@ -145,11 +145,69 @@ thật thay vì đoán).
 - **Lịch sự với API:** tải tuần tự từng chương, nghỉ ~150ms giữa các request.
 - **Ưu tiên DB:** Home/Detail/Reader đọc từ DB trước, chưa đồng bộ thì tự
   fallback về API. Nút "⏹ Dừng" để ngắt giữa chừng.
-- Truyện dài 1000+ chương có thể mất vài phút — cứ để tab mở.
+- Truyện dài 1000+ chương có thể mất vài phút — dùng "▶ Chạy nền" (mục 7b)
+  để tắt tab vẫn xong.
 
 **Bảng:** `synced_novels` (metadata, khóa `${source_id}:${api_id}`) và
 `synced_chapters` (nội dung, khóa `(novel_id, chapter_number)`). Ai cũng đọc
 được, chỉ admin ghi được (RLS + `is_admin()`).
+
+### 7b. Đồng bộ nền — tắt tab vẫn chạy ⚙️
+
+Đồng bộ thường chạy trong tab trình duyệt (tắt tab là dừng). Muốn "bật rồi đi
+ngủ", dùng **đồng bộ nền**: job chạy trên server bằng Supabase Edge Function
+`sync-worker`, tắt tab thoải mái, mở lại xem tiến trình realtime.
+
+**Kiến trúc:**
+- Admin bấm "▶ Chạy nền" → tạo dòng trong bảng `sync_jobs` → gọi Edge Function
+  → function **trả lời ngay** `{ ok:true, job_id }` rồi xử lý nền bằng
+  `EdgeRuntime.waitUntil` (user tắt tab, server vẫn chạy).
+- Mỗi lượt function xử lý tối đa ~8 phút; hết giờ thì **tự gọi lại chính mình**
+  để làm tiếp chunk sau (nối đuôi, không mất tiến trình).
+- Tiến trình (`done/total/skipped` + `heartbeat_at`) được ghi vào `sync_jobs`
+  mỗi 10 chương — tab admin subscribe realtime nên thấy live.
+- Có thể **Hủy** job đang chạy, hoặc **Tiếp tục** job bị lỗi / đứng quá 10 phút.
+- Chỉ admin mới tạo/xem job được (RLS `is_admin()`; function tự kiểm tra JWT).
+
+**Deploy Edge Function (không cần CLI):**
+
+1. Chạy migration SQL tạo bảng `sync_jobs` (xem mục "SQL migration" bên dưới).
+2. Vào Supabase Dashboard → **Edge Functions** → **Create a new function** →
+   đặt tên `sync-worker` → mở file `supabase/functions/sync-worker/index.ts`
+   trong repo, **copy toàn bộ** → paste vào editor → **Deploy**.
+3. Xong! Vào web → Quản trị → tab 🔄 Đồng bộ → bấm "▶ Chạy nền" cạnh bất kỳ
+   nút đồng bộ nào.
+
+> Lưu ý: `SUPABASE_URL` và `SUPABASE_SERVICE_ROLE_KEY` đã có sẵn trong môi
+> trường Edge Function, không cần cấu hình thêm. Service role key chỉ được đọc
+> từ `Deno.env` bên trong function, không hardcode ở đâu cả.
+
+**SQL migration — chạy 1 lần trong Supabase SQL Editor:**
+
+```sql
+create table if not exists public.sync_jobs (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null,
+  source_id text,
+  novel_key text,
+  status text not null default 'pending',
+  total int not null default 0,
+  done int not null default 0,
+  skipped int not null default 0,
+  error text,
+  heartbeat_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.sync_jobs enable row level security;
+drop policy if exists sync_jobs_admin_all on public.sync_jobs;
+create policy sync_jobs_admin_all on public.sync_jobs
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+grant all on public.sync_jobs to authenticated;
+alter publication supabase_realtime add table public.sync_jobs;
+```
 
 ## 8. Gemini API keys & Nhập truyện thủ công 🤖✍️
 
