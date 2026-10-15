@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { getSupabase, getSupabaseUrl } from '../lib/supabase';
 import { fetchOpenApiInfo, fetchNovels } from '../lib/novelApi';
 import type { ApiSourceRow, NovelSummary } from '../lib/novelApi';
 import { generateCover, generateAICover, uploadCover } from '../components/CoverGenerator';
 import type { CosmeticItem } from '../components/Treasury';
 import { useAuth } from '../context/AuthContext';
+import { useTemplate } from '../context/TemplateContext';
+import { TEMPLATES, getTemplateDef } from '../theme/templates';
 
-type Tab = 'overview' | 'users' | 'sources' | 'thumbnails' | 'items' | 'defaults' | 'system';
+type Tab = 'overview' | 'users' | 'sources' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: '📊 Tổng quan' },
@@ -15,6 +18,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'thumbnails', label: '🖼️ Thumbnail' },
   { id: 'items', label: '⚔️ Vật phẩm' },
   { id: 'defaults', label: '🌱 Nhân vật mới' },
+  { id: 'theme', label: '🎨 Giao diện' },
   { id: 'system', label: '🖥️ Hệ thống' },
 ];
 
@@ -862,6 +866,107 @@ function SystemTab() {
   );
 }
 
+/* ---------------- Giao diện (chọn template) ---------------- */
+function ThemeTab() {
+  const { template, setTemplate } = useTemplate();
+  const [applying, setApplying] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const apply = async (id: string) => {
+    if (id === template) return;
+    setApplying(id);
+    setNote(null);
+    try {
+      await setTemplate(id);
+      const def = getTemplateDef(id);
+      setNote(`✅ Đã áp dụng template "${def.name}" cho toàn site.`);
+    } catch (e) {
+      setNote(`❌ ${e instanceof Error ? e.message : 'Áp dụng thất bại.'}`);
+    } finally {
+      setApplying(null);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className={card}>
+        <p className="font-bold text-stone-900 dark:text-stone-100">🎨 Template giao diện</p>
+        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+          Đổi là áp dụng ngay cho toàn bộ website (lưu ở bảng{' '}
+          <code>site_settings</code>, realtime tới mọi máy đang mở).
+        </p>
+      </div>
+      {note && <p className="text-sm">{note}</p>}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {TEMPLATES.map((t) => {
+          const active = template === t.id;
+          const busy = applying === t.id;
+          return (
+            <div
+              key={t.id}
+              className={`${card} ${active ? 'ring-2' : ''}`}
+              style={active ? ({ ['--tw-ring-color' as string]: 'var(--brand)' } as CSSProperties) : undefined}
+            >
+              {/* mock preview nhỏ */}
+              <div
+                className="overflow-hidden rounded-lg"
+                style={{ background: 'var(--page-bg)', border: '1px solid color-mix(in srgb, var(--ink) 12%, transparent)' }}
+              >
+                <div
+                  className="flex items-center gap-1 px-2 py-1.5"
+                  style={{ background: t.swatches[2] }}
+                >
+                  <span className="text-xs">📖</span>
+                  <span className="text-[11px] font-bold" style={{ color: t.swatches[0] }}>
+                    Mê Truyện
+                  </span>
+                </div>
+                <div className="flex gap-1 p-2">
+                  {[0, 1].map((i) => (
+                    <div
+                      key={i}
+                      className="h-14 flex-1 rounded"
+                      style={{
+                        background: `linear-gradient(135deg, ${t.swatches[0]}55, ${t.swatches[1]}88)`,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                {t.swatches.map((c, i) => (
+                  <span
+                    key={i}
+                    className="h-5 w-5 rounded-full border border-black/10"
+                    style={{ background: c }}
+                  />
+                ))}
+                {active && (
+                  <span
+                    className="ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
+                    style={{ background: 'var(--brand)' }}
+                  >
+                    Đang dùng
+                  </span>
+                )}
+              </div>
+              <p className="mt-1.5 font-bold text-stone-900 dark:text-stone-100">{t.name}</p>
+              <p className="text-xs text-stone-500 dark:text-stone-400">{t.desc}</p>
+              <button
+                onClick={() => void apply(t.id)}
+                disabled={busy || active}
+                className={`${btnPrimary} mt-2 w-full`}
+              >
+                {busy ? 'Đang áp dụng...' : active ? '✓ Đang dùng' : 'Áp dụng'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Admin chính ---------------- */
 export default function Admin() {
   const { isAdmin, profile } = useAuth();
@@ -904,6 +1009,7 @@ export default function Admin() {
         {tab === 'thumbnails' && <ThumbnailsTab />}
         {tab === 'items' && <ItemsTab />}
         {tab === 'defaults' && <DefaultsTab />}
+        {tab === 'theme' && <ThemeTab />}
         {tab === 'system' && <SystemTab />}
       </div>
     </div>

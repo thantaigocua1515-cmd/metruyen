@@ -355,3 +355,32 @@ drop policy if exists storage_auth_delete on storage.objects;
 create policy storage_auth_delete on storage.objects
   for delete to authenticated
   using (bucket_id in ('avatars', 'frames', 'covers'));
+
+-- 19. site_settings: cấu hình chung của site (template giao diện...) ---------------
+create table if not exists public.site_settings (
+  key text primary key,
+  value text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+alter table public.site_settings enable row level security;
+
+-- ai cũng đọc được (để web biết template đang dùng)
+drop policy if exists site_settings_select_all on public.site_settings;
+create policy site_settings_select_all on public.site_settings
+  for select using (true);
+
+-- chỉ admin được ghi
+drop policy if exists site_settings_admin_write on public.site_settings;
+create policy site_settings_admin_write on public.site_settings
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- seed template mặc định
+insert into public.site_settings (key, value)
+values ('active_template', 'thu-cac')
+on conflict (key) do nothing;
+
+-- realtime: đổi template trong admin → áp dụng ngay mọi máy
+alter publication supabase_realtime add table public.site_settings;

@@ -32,6 +32,8 @@ export interface NovelSummary {
   coverUrl?: string | null;
   chaptersCount: number;
   translatedChaptersCount: number;
+  /** trạng thái từ API (ví dụ: "ongoing", "completed", "crawling") — có thể null */
+  status?: string | null;
   links: NovelLinks;
 }
 
@@ -109,6 +111,7 @@ function mapNovel(raw: Record<string, unknown>, source: ApiSourceRow): NovelSumm
     coverUrl: (raw.coverUrl as string | null) ?? (raw.cover as string | null) ?? null,
     chaptersCount: toNumber(raw.chaptersCount),
     translatedChaptersCount: toNumber(raw.translatedChaptersCount, toNumber(raw.chaptersCount)),
+    status: typeof raw.status === 'string' ? raw.status : null,
     links: {
       self: typeof links.self === 'string' ? links.self : undefined,
       epub: typeof links.epub === 'string' ? links.epub : undefined,

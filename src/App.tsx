@@ -1,9 +1,11 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
+import { TemplateProvider } from './context/TemplateContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { isSupabaseConfigured } from './lib/supabase';
 import Navbar from './components/Navbar';
+import BottomTabBar from './components/BottomTabBar';
 import Home from './pages/Home';
 import NovelDetail from './pages/NovelDetail';
 import Reader from './pages/Reader';
@@ -13,6 +15,8 @@ import Inventory from './components/Inventory';
 import Treasury from './components/Treasury';
 import Leaderboard from './components/Leaderboard';
 import UserProfile from './pages/UserProfile';
+import Search from './pages/Search';
+import Genres from './pages/Genres';
 import Admin from './pages/Admin';
 import Auth from './pages/Auth';
 
@@ -65,18 +69,24 @@ export default function App() {
   }
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <HashRouter>
-          <div className="flex min-h-screen flex-col bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
-            <Navbar />
-            <main className="flex-1">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/novel/:sourceId/:novelId" element={<NovelDetail />} />
+      <TemplateProvider>
+        <AuthProvider>
+          <HashRouter>
+            <div
+              className="flex min-h-screen flex-col"
+              style={{ background: 'var(--page-bg)', color: 'var(--ink)' }}
+            >
+              <Navbar />
+              <main className="flex-1">
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/novel/:sourceId/:novelId" element={<NovelDetail />} />
                 <Route path="/read/:sourceId/:novelId/:chapter" element={<Reader />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/user/:userId" element={<UserProfile />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/genres" element={<Genres />} />
                 <Route
                   path="/bookshelf"
                   element={
@@ -123,9 +133,11 @@ export default function App() {
             <footer className="border-t border-amber-900/10 py-4 text-center text-xs text-stone-400 dark:border-amber-100/10 dark:text-stone-500">
               📚 Mê Truyện — thư các tu tiên · đọc để tăng tu vi
             </footer>
+            <BottomTabBar />
           </div>
         </HashRouter>
-      </AuthProvider>
+        </AuthProvider>
+      </TemplateProvider>
     </ThemeProvider>
   );
 }

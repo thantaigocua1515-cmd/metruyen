@@ -62,12 +62,15 @@ Vì dùng HashRouter nên không cần cấu hình rewrite gì thêm — mở l�
   (đọc 60 giây thật mới cộng 60 giây — tab ẩn thì không tính).
 - **Linh thạch:** đọc 5 phút được +1 linh thạch, dùng mua khung/pháp bảo ở
   **Tàng Bảo Các**, cất trong **Túi Trữ Vật**.
+- **5 template giao diện** (xem mục 6): Thư Các Tu Tiên (mặc định), TruyenC Hiện
+  Đại, Dạ Huyền Ảo, Cổ Phong, Tối Giản — đổi trong admin, áp dụng realtime.
 - **Admin panel** (chỉ hiện với role admin): Tổng quan, Người dùng (sửa role,
   cộng/trừ giờ đọc & linh thạch, xóa), Nguồn API (thêm/sửa/bật-tắt link
   openapi + nút Kiểm tra), Thumbnail (đổi URL hoặc **tạo bằng AI** vẽ tên
   truyện + tên tác giả lên bìa), Vật phẩm (tải khung/pháp bảo có xem trước
   và chỉnh scale/offset), Nhân vật mới (linh thạch/giờ tu luyện/vật phẩm
-  tặng sẵn cho tài khoản mới), Hệ thống (trạng thái kết nối Supabase).
+  tặng sẵn cho tài khoản mới), **Giao diện** (chọn template), Hệ thống
+  (trạng thái kết nối Supabase).
 
 ## 5. Cấu trúc thư mục
 
@@ -76,8 +79,38 @@ supabase/schema.sql      schema Postgres đầy đủ (bảng + RLS + trigger + 
 src/lib/supabase.ts      khởi tạo Supabase client từ env
 src/lib/novelApi.ts       client NovelFlow/OpenAPI (nhiều nguồn, gộp danh sách)
 src/lib/tuvi.ts           thang 15 cảnh giới tu vi
-src/context/             AuthContext (username/password), ThemeContext (light/dark)
-src/components/          Navbar, AvatarWithFrame, NovelCard, ReaderView (cuộn vô hạn),
+src/lib/genres.ts         đoán thể loại bằng keyword (heuristic — API chưa có trường này)
+src/lib/useNovels.ts      hook tải truyện dùng chung (Home/Search/Genres)
+src/theme/templates.ts    registry 5 template giao diện
+src/context/             AuthContext (username/password), ThemeContext (light/dark),
+                         TemplateContext (template hiện tại, realtime qua site_settings)
+src/components/          Navbar, BottomTabBar, AvatarWithFrame, NovelCard, ReaderView,
                          Leaderboard (realtime), Treasury, Inventory, CoverGenerator
-src/pages/               Home, NovelDetail, Reader, Bookshelf, Profile, Admin, Auth
+src/pages/               Home, NovelDetail, Reader, Bookshelf, Profile, UserProfile,
+                         Search, Genres, Admin, Auth
 ```
+
+## 6. Template giao diện 🎨
+
+Web có 5 bộ skin, đổi trong **Quản trị → tab 🎨 Giao diện** (chỉ admin).
+Đổi là áp dụng **ngay lập tức cho toàn site** (lưu ở bảng `site_settings`,
+realtime tới mọi máy đang mở web):
+
+| ID | Tên | Phong cách |
+|---|---|---|
+| `thu-cac` | Thư Các Tu Tiên *(mặc định)* | Tông hổ phách thư các cổ điển |
+| `truyenc` | TruyenC Hiện Đại | Trắng/tím hiện đại, bottom tab bar mobile, mục Truyện Hot |
+| `da-huyen-ao` | Dạ Huyền Ảo | Dark fantasy nền đêm tím |
+| `co-phong` | Cổ Phong | Giấy dó, đỏ son + vàng đồng, serif |
+| `toi-gian` | Tối Giản | Minimal xám đá, tập trung nội dung |
+
+- Nút Light/Dark vẫn hoạt động với mọi template.
+- Template `truyenc` có thêm trang **Tìm kiếm** (`/search`) và **Thể loại**
+  (`/genres`). Thể loại do web **tự đoán theo từ khóa** tiêu đề/mô tả
+  (`src/lib/genres.ts`) vì API chưa trả trường thể loại — không bịa
+  rating/lượt xem.
+- **Thêm template mới:** (1) thêm 1 object vào `TEMPLATES` trong
+  `src/theme/templates.ts`; (2) thêm block CSS vars `[data-template="<id>"]`
+  (+ `.dark[data-template="<id>"]`) trong `src/theme.css`; (3) nếu cần layout
+  riêng, rẽ nhánh theo `useTemplate()` trong component (xem `NovelCard`,
+  `Navbar`, `Home` làm mẫu).

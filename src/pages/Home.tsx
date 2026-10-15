@@ -1,65 +1,110 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { getSupabase } from '../lib/supabase';
-import { fetchNovels } from '../lib/novelApi';
-import type { ApiSourceRow, NovelSummary } from '../lib/novelApi';
+import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useTemplate } from '../context/TemplateContext';
+import { useNovels } from '../lib/useNovels';
+import { GENRES, filterByGenre } from '../lib/genres';
 import NovelCard from '../components/NovelCard';
 
-export default function Home() {
+function LoadingBlock() {
+  return (
+    <p className="py-16 text-center" style={{ color: 'var(--muted)' }}>
+      📖 Đang thỉnh kinh từ các nguồn...
+    </p>
+  );
+}
+
+function ErrorBlock({ error }: { error: string }) {
+  return (
+    <div className="mx-auto max-w-xl rounded-xl border border-red-300 bg-red-50 p-4 text-center text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+      {error}
+    </div>
+  );
+}
+
+/** Trang chủ kiểu TruyenC: Truyện Hot + pills thể loại + lưới card 2 cột. */
+function TruyencHome() {
+  const { novels, overrides, loading, error } = useNovels();
+  const [genre, setGenre] = useState('all');
+
+  const hot = useMemo(() => {
+    const list = filterByGenre(novels, genre);
+    return [...list].sort((a, b) => b.chaptersCount - a.chaptersCount);
+  }, [novels, genre]);
+
+  return (
+    <div className="mx-auto max-w-7xl px-3 py-5 sm:px-4">
+      {/* Tiêu đề mục Hot */}
+      <div className="flex items-center gap-2">
+        <span
+          className="flex h-11 w-11 items-center justify-center rounded-2xl text-2xl"
+          style={{ background: 'var(--brand-soft)' }}
+        >
+          🔥
+        </span>
+        <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--ink)' }}>
+          Truyện Hot
+        </h1>
+      </div>
+      <Link
+        to="/genres"
+        className="mt-1 inline-block text-sm font-semibold"
+        style={{ color: 'var(--brand)' }}
+      >
+        Xem tất cả <span aria-hidden>›</span>
+      </Link>
+
+      {/* Pills thể loại cuộn ngang */}
+      <div className="no-scrollbar -mx-3 mt-3 flex gap-2 overflow-x-auto px-3 pb-1">
+        {GENRES.filter((g) => g.id !== 'khac').map((g) => {
+          const active = genre === g.id;
+          return (
+            <button
+              key={g.id}
+              onClick={() => setGenre(g.id)}
+              className="shrink-0 whitespace-nowrap rounded-full px-5 py-2 text-sm font-semibold transition"
+              style={
+                active
+                  ? { background: 'var(--brand)', color: '#fff', boxShadow: '0 4px 12px color-mix(in srgb, var(--brand) 40%, transparent)' }
+                  : {
+                      background: 'var(--card-bg)',
+                      color: 'var(--muted)',
+                      border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)',
+                    }
+              }
+            >
+              {g.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading && <LoadingBlock />}
+      {error && <ErrorBlock error={error} />}
+
+      {!loading && !error && hot.length === 0 && (
+        <p className="py-16 text-center italic" style={{ color: 'var(--muted)' }}>
+          Chưa có truyện nào. Admin hãy bật nguồn API trong Quản trị → Nguồn API.
+        </p>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5">
+        {hot.map((n) => (
+          <NovelCard
+            key={`${n.sourceId}:${n.id}`}
+            novel={n}
+            coverOverride={overrides[`${n.sourceId}:${n.id}`]}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Trang chủ mặc định (các template còn lại). */
+function DefaultHome() {
   const [searchParams] = useSearchParams();
   const q = (searchParams.get('q') ?? '').trim().toLowerCase();
-  const [novels, setNovels] = useState<NovelSummary[]>([]);
-  const [overrides, setOverrides] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const supabase = getSupabase();
-        const { data: sources, error: sErr } = await supabase
-          .from('api_sources')
-          .select('id,name,openapi_url,base_url,is_active')
-          .eq('is_active', true);
-        if (sErr) throw sErr;
-        const list = (sources ?? []) as ApiSourceRow[];
-        const all: NovelSummary[] = [];
-        for (const s of list) {
-          try {
-            const ns = await fetchNovels(s);
-            all.push(...ns);
-          } catch (e) {
-            console.warn(`Nguồn "${s.name}" lỗi:`, e);
-          }
-        }
-        const { data: ov } = await supabase
-          .from('thumbnail_overrides')
-          .select('source_id,novel_id,thumbnail_url');
-        const map: Record<string, string> = {};
-        for (const r of (ov ?? []) as {
-          source_id: string;
-          novel_id: string;
-          thumbnail_url: string;
-        }[]) {
-          map[`${r.source_id}:${r.novel_id}`] = r.thumbnail_url;
-        }
-        if (alive) {
-          setNovels(all);
-          setOverrides(map);
-        }
-      } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : 'Tải danh sách truyện thất bại.');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const { novels, overrides, loading, error } = useNovels();
 
   const filtered = useMemo(() => {
     if (!q) return novels;
@@ -72,10 +117,13 @@ export default function Home() {
   return (
     <div className="mx-auto max-w-7xl px-3 py-6 sm:px-4">
       <div className="mb-6 text-center">
-        <h1 className="font-display text-3xl font-bold text-amber-950 dark:text-amber-100">
+        <h1
+          className="text-3xl font-bold"
+          style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)' }}
+        >
           📚 Thư Các Mê Truyện
         </h1>
-        <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+        <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
           {q ? (
             <>
               Kết quả cho "<b>{searchParams.get('q')}</b>": {filtered.length} truyện
@@ -86,20 +134,11 @@ export default function Home() {
         </p>
       </div>
 
-      {loading && (
-        <p className="py-16 text-center text-stone-500 dark:text-stone-400">
-          📖 Đang thỉnh kinh từ các nguồn...
-        </p>
-      )}
-
-      {error && (
-        <div className="mx-auto max-w-xl rounded-xl border border-red-300 bg-red-50 p-4 text-center text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
-          {error}
-        </div>
-      )}
+      {loading && <LoadingBlock />}
+      {error && <ErrorBlock error={error} />}
 
       {!loading && !error && filtered.length === 0 && (
-        <p className="py-16 text-center italic text-stone-500 dark:text-stone-400">
+        <p className="py-16 text-center italic" style={{ color: 'var(--muted)' }}>
           Chưa có truyện nào. Admin hãy bật nguồn API trong Quản trị → Nguồn API.
         </p>
       )}
@@ -115,4 +154,10 @@ export default function Home() {
       </div>
     </div>
   );
+}
+
+export default function Home() {
+  const { template } = useTemplate();
+  if (template === 'truyenc') return <TruyencHome />;
+  return <DefaultHome />;
 }

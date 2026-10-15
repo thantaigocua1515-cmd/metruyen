@@ -3,8 +3,107 @@
 /* Dark mode theo class .dark trên <html> */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ================= Template skins =================
+   Mỗi template định nghĩa bộ CSS vars qua [data-template="..."]
+   (được set bởi TemplateContext). Component dùng var(--brand),
+   var(--page-bg), var(--card-bg)... để ăn theo skin. */
 :root {
+  /* thu-cac — Thư Các Tu Tiên (mặc định) */
+  --brand: #b45309;
+  --brand-strong: #92400e;
+  --brand-soft: #fef3c7;
+  --page-bg: #fafaf9;
+  --card-bg: #ffffff;
+  --ink: #1c1917;
+  --muted: #78716c;
   --font-display: "Georgia", "Times New Roman", "Noto Serif", serif;
+}
+[data-template="truyenc"] {
+  --brand: #7c3aed;
+  --brand-strong: #6d28d9;
+  --brand-soft: #ede9fe;
+  --page-bg: #ffffff;
+  --card-bg: #ffffff;
+  --ink: #211d33;
+  --muted: #6b7280;
+  --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+[data-template="da-huyen-ao"] {
+  --brand: #8b5cf6;
+  --brand-strong: #a78bfa;
+  --brand-soft: #2e1065;
+  --page-bg: #0d0a18;
+  --card-bg: #181226;
+  --ink: #ede9fe;
+  --muted: #a89cc8;
+  --font-display: "Georgia", "Times New Roman", serif;
+}
+[data-template="co-phong"] {
+  --brand: #b91c1c;
+  --brand-strong: #991b1b;
+  --brand-soft: #fde8e8;
+  --page-bg: #f7f1e3;
+  --card-bg: #fffdf7;
+  --ink: #3f2d1c;
+  --muted: #8a7a5f;
+  --font-display: "Noto Serif", "Georgia", "Times New Roman", serif;
+}
+[data-template="toi-gian"] {
+  --brand: #334155;
+  --brand-strong: #1e293b;
+  --brand-soft: #e2e8f0;
+  --page-bg: #f8fafc;
+  --card-bg: #ffffff;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Dark mode: ghi đè vars (đặt sau nên thắng khi cùng độ ưu tiên) */
+.dark {
+  --brand: #fbbf24;
+  --brand-strong: #f59e0b;
+  --brand-soft: #451a03;
+  --page-bg: #0c0a09;
+  --card-bg: #1c1917;
+  --ink: #e7e5e4;
+  --muted: #a8a29e;
+}
+.dark[data-template="truyenc"] {
+  --brand: #a78bfa;
+  --brand-strong: #8b5cf6;
+  --brand-soft: #2e1065;
+  --page-bg: #0e0b16;
+  --card-bg: #171225;
+  --ink: #f1efff;
+  --muted: #9c94b8;
+}
+.dark[data-template="da-huyen-ao"] {
+  --brand: #a78bfa;
+  --brand-strong: #8b5cf6;
+  --brand-soft: #1e1440;
+  --page-bg: #080614;
+  --card-bg: #120d22;
+  --ink: #f2edff;
+  --muted: #b0a4d4;
+}
+.dark[data-template="co-phong"] {
+  --brand: #f87171;
+  --brand-strong: #ef4444;
+  --brand-soft: #450a0a;
+  --page-bg: #171008;
+  --card-bg: #221a10;
+  --ink: #f3e9d2;
+  --muted: #a89880;
+}
+.dark[data-template="toi-gian"] {
+  --brand: #94a3b8;
+  --brand-strong: #cbd5e1;
+  --brand-soft: #1e293b;
+  --page-bg: #020617;
+  --card-bg: #0f172a;
+  --ink: #e2e8f0;
+  --muted: #94a3b8;
 }
 
 html {
@@ -15,6 +114,9 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  background: var(--page-bg);
+  color: var(--ink);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Chữ tiêu đề phong cách thư các */
@@ -72,4 +174,13 @@ body {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Ẩn scrollbar cho hàng pill cuộn ngang */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
