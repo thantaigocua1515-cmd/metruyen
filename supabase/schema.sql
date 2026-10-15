@@ -444,3 +444,21 @@ grant all on public.synced_novels, public.synced_chapters to authenticated;
 -- realtime
 alter publication supabase_realtime add table public.synced_novels;
 alter publication supabase_realtime add table public.synced_chapters;
+
+-- 21. Gemini API keys (chỉ admin đọc/ghi — KHÔNG có policy public) -----------------
+create table if not exists public.gemini_keys (
+  id uuid primary key default gen_random_uuid(),
+  label text not null default '',
+  api_key text not null,
+  is_active boolean not null default true,
+  last_tested_at timestamptz,
+  last_test_ok boolean,
+  created_at timestamptz not null default now()
+);
+alter table public.gemini_keys enable row level security;
+drop policy if exists gemini_keys_admin_all on public.gemini_keys;
+create policy gemini_keys_admin_all on public.gemini_keys
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+grant all on public.gemini_keys to authenticated;

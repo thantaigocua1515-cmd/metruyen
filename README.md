@@ -67,8 +67,10 @@ Vì dùng HashRouter nên không cần cấu hình rewrite gì thêm — mở l�
 - **Admin panel** (chỉ hiện với role admin): Tổng quan, Người dùng (sửa role,
   cộng/trừ giờ đọc & linh thạch, xóa), Nguồn API (thêm/sửa/bật-tắt link
   openapi + nút Kiểm tra), **Đồng bộ** (kéo truyện từ API về database của
-  mình — xem mục 7), Thumbnail (đổi URL hoặc **tạo bằng AI** vẽ tên
-  truyện + tên tác giả lên bìa), Vật phẩm (tải khung/pháp bảo có xem trước
+  mình — xem mục 7), Thumbnail (đổi URL hoặc **tạo bằng AI** — chọn nguồn
+  Pollinations (miễn phí) hoặc Gemini (dùng key ở tab 🤖 Gemini, tự xoay key khi
+  hết quota; nguồn chính lỗi thì tự thử nguồn còn lại, rồi mới dùng bản vẽ
+  canvas) vẽ tên truyện + tên tác giả lên bìa), Vật phẩm (tải khung/pháp bảo có xem trước
   và chỉnh scale/offset), Nhân vật mới (linh thạch/giờ tu luyện/vật phẩm
   tặng sẵn cho tài khoản mới), **Giao diện** (chọn template), Hệ thống
   (trạng thái kết nối Supabase).
@@ -147,3 +149,42 @@ thật thay vì đoán).
 **Bảng:** `synced_novels` (metadata, khóa `${source_id}:${api_id}`) và
 `synced_chapters` (nội dung, khóa `(novel_id, chapter_number)`). Ai cũng đọc
 được, chỉ admin ghi được (RLS + `is_admin()`).
+
+## 8. Gemini API keys & Nhập truyện thủ công 🤖✍️
+
+**Tab 🤖 Gemini — quản lý key dịch thuật:**
+- Lấy key miễn phí tại Google AI Studio (aistudio.google.com) → nhập tên gợi nhớ
+  + key → bấm "🔍 Kiểm tra & Lưu". Web gọi `GET /v1beta/models?key=...` kiểm tra;
+  **chỉ key HTTP 200 mới được lưu** (kèm thời gian + kết quả test).
+- Danh sách key: hiện che đi (`AIzaSyA…`), trạng thái bật/tắt, kết quả test gần
+  nhất; có nút kiểm tra lại, bật/tắt, xóa.
+- Key lưu trong bảng `gemini_keys` — **chỉ admin đọc/ghi** (không có policy
+  public nào). Trình duyệt gọi thẳng API Gemini khi dịch.
+
+**Dịch Trung → Việt** (`src/lib/translate.ts`):
+- Model `gemini-2.0-flash`, prompt dịch giả truyện tu tiên/huyền huyễn, chia
+  chunk ≤ 6000 ký tự (cắt ở ranh giới đoạn), mỗi request timeout 60s.
+- **Xoay vòng key:** mỗi chunk thử lần lượt các key đang bật (lệch vòng để chia
+  tải); key nào lỗi (401/403/429/quota/mạng) → tự thử key tiếp theo. Hết key →
+  báo lỗi tiếng Việt rõ ràng.
+
+**Tab ✍️ Nhập truyện — nhập tay nội dung bạn có quyền dùng:**
+1. **Bước 1 — Tạo truyện:** tên (*), tác giả, mô tả, link bìa → lưu vào
+   `synced_novels` với `source_id='manual'` (hiện trên web với tên nguồn
+   "📝 Nhập tay").
+2. **Bước 2 — Nhập chương:** dán nhiều chương theo format:
+   ```
+   === Chương 1: Tiêu đề chương ===
+   Nội dung chương...
+   === Chương 2: Tiêu đề ===
+   ...
+   ```
+   Web tự nhận diện chương (hiện số chương + số ký tự). Nút "🤖 Dịch tất cả
+   bằng Gemini" dịch từng chương (hiện tiến độ, chống bấm đúp), bản dịch hiện
+   lại trong ô text để **kiểm tra/sửa trước khi lưu**. Nút "💾 Lưu vào database"
+   upsert vào `synced_chapters` và cập nhật số chương của truyện.
+3. Danh sách truyện đã nhập tay + nút xóa (xóa cascade cả chương).
+- **Lưu ý:** chỉ nhập nội dung bạn có quyền sử dụng (tự sáng tác, bản dịch của
+  bạn, tác phẩm miễn phí/không bản quyền). Không có chức năng cào web tự động.
+- Truyện manual đọc được ngay trên web (Home/Detail/Reader đều đọc DB-first);
+  `checkUpdates` bỏ qua nguồn manual.

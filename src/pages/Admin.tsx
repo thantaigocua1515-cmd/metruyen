@@ -6,19 +6,22 @@ import type { ApiSourceRow, NovelSummary } from '../lib/novelApi';
 import { syncNovelList, syncChapters, checkUpdates } from '../lib/sync';
 import { getSyncedNovels } from '../lib/library';
 import type { SyncedNovelRow } from '../lib/library';
+import { testGeminiKey, translateText, generateGeminiCover, getActiveKeys } from '../lib/translate';
 import { generateCover, generateAICover, uploadCover } from '../components/CoverGenerator';
 import type { CosmeticItem } from '../components/Treasury';
 import { useAuth } from '../context/AuthContext';
 import { useTemplate } from '../context/TemplateContext';
 import { TEMPLATES, getTemplateDef } from '../theme/templates';
 
-type Tab = 'overview' | 'users' | 'sources' | 'sync' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system';
+type Tab = 'overview' | 'users' | 'sources' | 'sync' | 'gemini' | 'import' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: '📊 Tổng quan' },
   { id: 'users', label: '👥 Người dùng' },
   { id: 'sources', label: '🔗 Nguồn API' },
   { id: 'sync', label: '🔄 Đồng bộ' },
+  { id: 'gemini', label: '🤖 Gemini' },
+  { id: 'import', label: '✍️ Nhập truyện' },
   { id: 'thumbnails', label: '🖼️ Thumbnail' },
   { id: 'items', label: '⚔️ Vật phẩm' },
   { id: 'defaults', label: '🌱 Nhân vật mới' },
@@ -367,6 +370,7 @@ function NovelThumbRow({
 }) {
   const [url, setUrl] = useState(current ?? '');
   const [busy, setBusy] = useState(false);
+  const [aiSource, setAiSource] = useState<'pollinations' | 'gemini'>('pollinations');
 
   useEffect(() => {
     setUrl(current ?? '');
@@ -414,22 +418,36 @@ function NovelThumbRow({
   };
 
   const genAI = async () => {
+    if (busy) return;
     setBusy(true);
     try {
-      // Ưu tiên ảnh AI (Pollinations, miễn phí); bận/lỗi thì dùng bản vẽ canvas
+      if (aiSource === 'gemini') {
+        const keys = await getActiveKeys();
+        if (keys.length === 0) {
+          alert('Chưa có Gemini API key nào đang bật. Vào tab 🤖 Gemini để thêm key trước nhé.');
+          return;
+        }
+      }
+      // Nguồn chính → nguồn còn lại → bản vẽ canvas
       let blob: Blob;
-      let usedFallback = false;
+      let usedCanvasFallback = false;
+      const primary = aiSource === 'gemini' ? generateGeminiCover : generateAICover;
+      const secondary = aiSource === 'gemini' ? generateAICover : generateGeminiCover;
       try {
-        blob = await generateAICover(novel.title, novel.author);
+        blob = await primary(novel.title, novel.author);
       } catch {
-        usedFallback = true;
-        blob = await generateCover(novel.title, novel.author);
+        try {
+          blob = await secondary(novel.title, novel.author);
+        } catch {
+          usedCanvasFallback = true;
+          blob = await generateCover(novel.title, novel.author);
+        }
       }
       const publicUrl = await uploadCover(blob, novel.sourceId, novel.id);
       setUrl(publicUrl);
       await save(publicUrl);
-      if (usedFallback) {
-        alert('AI đang bận nên đã tạo bìa bằng bản vẽ canvas. Thử lại sau để dùng ảnh AI nhé.');
+      if (usedCanvasFallback) {
+        alert('Cả hai nguồn AI đều bận/lỗi nên đã tạo bìa bằng bản vẽ canvas. Thử lại sau nhé.');
       }
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Tạo thumbnail thất bại.');
@@ -457,6 +475,16 @@ function NovelThumbRow({
           <button onClick={() => void saveUrl()} disabled={busy} className={btnPrimary}>
             Lưu URL
           </button>
+          <select
+            value={aiSource}
+            onChange={(e) => setAiSource(e.target.value as 'pollinations' | 'gemini')}
+            disabled={busy}
+            className={btnGhost}
+            title="Chọn nguồn AI tạo ảnh"
+          >
+            <option value="pollinations">Pollinations (miễn phí)</option>
+            <option value="gemini">Gemini (cần key)</option>
+          </select>
           <button onClick={() => void genAI()} disabled={busy} className={btnGhost}>
             {busy ? '...' : '✨ Tạo bằng AI'}
           </button>
@@ -1180,6 +1208,534 @@ function SyncTab() {
   );
 }
 
+/* ---------------- Gemini API keys (dịch thuật) ---------------- */
+interface GeminiKeyRow {
+  id: string;
+  label: string;
+  api_key: string;
+  is_active: boolean;
+  last_tested_at: string | null;
+  last_test_ok: boolean | null;
+}
+
+function maskKey(k: string): string {
+  return k.length > 7 ? `${k.slice(0, 7)}…` : '••••••';
+}
+
+function GeminiTab() {
+  const [keys, setKeys] = useState<GeminiKeyRow[]>([]);
+  const [label, setLabel] = useState('');
+  const [keyInput, setKeyInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const loadKeys = async () => {
+    try {
+      const sb = getSupabase();
+      const { data, error } = await sb.from('gemini_keys').select('*').order('created_at');
+      if (error) throw error;
+      setKeys((data ?? []) as GeminiKeyRow[]);
+    } catch (e) {
+      setMsg(`❌ ${e instanceof Error ? e.message : 'Không tải được danh sách key.'}`);
+    }
+  };
+  useEffect(() => {
+    void loadKeys();
+  }, []);
+
+  const addKey = async () => {
+    if (busy) return;
+    if (!label.trim()) {
+      setMsg('❌ Nhập tên gợi nhớ cho key.');
+      return;
+    }
+    if (!keyInput.trim()) {
+      setMsg('❌ Nhập API key.');
+      return;
+    }
+    setBusy(true);
+    setMsg('🔍 Đang kiểm tra kết nối key...');
+    try {
+      const ok = await testGeminiKey(keyInput);
+      if (!ok) {
+        setMsg('❌ Key không hoạt động (sai key hoặc bị chặn). Key chưa được lưu.');
+        return;
+      }
+      const sb = getSupabase();
+      const { error } = await sb.from('gemini_keys').insert({
+        label: label.trim(),
+        api_key: keyInput.trim(),
+        is_active: true,
+        last_tested_at: new Date().toISOString(),
+        last_test_ok: true,
+      });
+      if (error) throw error;
+      setLabel('');
+      setKeyInput('');
+      setMsg('✅ Key hoạt động — đã lưu vào database.');
+      await loadKeys();
+    } catch (e) {
+      setMsg(`❌ ${e instanceof Error ? e.message : 'Lưu key thất bại.'}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const retest = async (k: GeminiKeyRow) => {
+    setTestingId(k.id);
+    try {
+      const ok = await testGeminiKey(k.api_key);
+      const sb = getSupabase();
+      await sb
+        .from('gemini_keys')
+        .update({ last_tested_at: new Date().toISOString(), last_test_ok: ok })
+        .eq('id', k.id);
+      setMsg(ok ? `✅ Key "${k.label}" vẫn hoạt động.` : `❌ Key "${k.label}" không còn hoạt động.`);
+      await loadKeys();
+    } catch (e) {
+      setMsg(`❌ ${e instanceof Error ? e.message : 'Kiểm tra thất bại.'}`);
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const toggleActive = async (k: GeminiKeyRow) => {
+    const sb = getSupabase();
+    await sb.from('gemini_keys').update({ is_active: !k.is_active }).eq('id', k.id);
+    await loadKeys();
+  };
+
+  const removeKey = async (k: GeminiKeyRow) => {
+    if (!window.confirm(`Xóa key "${k.label}"?`)) return;
+    const sb = getSupabase();
+    await sb.from('gemini_keys').delete().eq('id', k.id);
+    await loadKeys();
+  };
+
+  const fmtDate = (s: string | null) =>
+    s ? new Date(s).toLocaleString('vi-VN', { hour12: false }) : '—';
+
+  return (
+    <div className="space-y-4">
+      <div className={card}>
+        <p className="font-bold text-stone-900 dark:text-stone-100">➕ Thêm Gemini API key</p>
+        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+          Lấy key miễn phí tại Google AI Studio (aistudio.google.com). Key được kiểm tra kết nối
+          trước khi lưu — key lỗi sẽ không lưu vào database.
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+          <input
+            className={inputCls}
+            placeholder="Tên gợi nhớ (vd: key chính)"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <input
+            className={`${inputCls} font-mono`}
+            placeholder="Dán Gemini API key (AIza...)"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            type="password"
+          />
+          <button onClick={() => void addKey()} disabled={busy} className={btnPrimary}>
+            {busy ? 'Đang kiểm tra...' : '🔍 Kiểm tra & Lưu'}
+          </button>
+        </div>
+        {msg && <p className="mt-2 text-sm">{msg}</p>}
+      </div>
+
+      <div className={card}>
+        <p className="font-bold text-stone-900 dark:text-stone-100">
+          🔑 Danh sách key ({keys.filter((k) => k.is_active).length} đang bật / {keys.length})
+        </p>
+        <div className="mt-3 space-y-2">
+          {keys.map((k) => (
+            <div
+              key={k.id}
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-900/10 bg-amber-50/50 px-3 py-2 text-sm dark:border-amber-100/10 dark:bg-stone-800/60"
+            >
+              <span className="font-bold">{k.label}</span>
+              <code className="rounded bg-stone-200/70 px-1.5 py-0.5 font-mono text-xs dark:bg-stone-700">
+                {maskKey(k.api_key)}
+              </code>
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  k.is_active
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                    : 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300'
+                }`}
+              >
+                {k.is_active ? 'đang bật' : 'đang tắt'}
+              </span>
+              <span className="text-xs text-stone-500 dark:text-stone-400">
+                {k.last_test_ok === null
+                  ? 'chưa test'
+                  : k.last_test_ok
+                    ? `✅ OK · ${fmtDate(k.last_tested_at)}`
+                    : `❌ lỗi · ${fmtDate(k.last_tested_at)}`}
+              </span>
+              <span className="ml-auto flex gap-1">
+                <button
+                  onClick={() => void retest(k)}
+                  disabled={testingId === k.id}
+                  className={btnGhost}
+                  title="Kiểm tra lại kết nối"
+                >
+                  {testingId === k.id ? '…' : '🔍'}
+                </button>
+                <button onClick={() => void toggleActive(k)} className={btnGhost} title="Bật/tắt">
+                  {k.is_active ? '⏸' : '▶'}
+                </button>
+                <button onClick={() => void removeKey(k)} className={btnGhost} title="Xóa key">
+                  🗑
+                </button>
+              </span>
+            </div>
+          ))}
+          {keys.length === 0 && (
+            <p className="py-4 text-center text-sm italic text-stone-500 dark:text-stone-400">
+              Chưa có key nào. Thêm key ở trên để dùng chức năng dịch.
+            </p>
+          )}
+        </div>
+        <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
+          ℹ️ Key lưu trong database, chỉ admin đọc được. Trình duyệt gọi thẳng API Gemini khi dịch;
+          key lỗi/hết quota sẽ tự xoay sang key khác còn bật.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Nhập truyện thủ công ---------------- */
+interface ParsedChapter {
+  num: number;
+  title: string;
+  content: string;
+}
+
+function parseChapters(text: string): ParsedChapter[] {
+  const re = /^===\s*Chương\s+(\d+)\s*:?\s*(.*?)\s*===\s*$/gim;
+  const matches = [...text.matchAll(re)];
+  const out: ParsedChapter[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const start = (m.index ?? 0) + m[0].length;
+    const end = i + 1 < matches.length ? (matches[i + 1].index ?? text.length) : text.length;
+    out.push({
+      num: parseInt(m[1], 10),
+      title: m[2]?.trim() ? m[2].trim() : `Chương ${m[1]}`,
+      content: text.slice(start, end).trim(),
+    });
+  }
+  return out
+    .filter((c) => c.content.length > 0)
+    .sort((a, b) => a.num - b.num);
+}
+
+function formatChapters(cs: ParsedChapter[]): string {
+  return cs.map((c) => `=== Chương ${c.num}: ${c.title} ===\n${c.content}`).join('\n\n');
+}
+
+/* dùng slugify() có sẵn trong file */
+
+const CHAPTER_FORMAT_HINT = `=== Chương 1: Tiêu đề chương ===
+Nội dung chương 1...
+
+=== Chương 2: Tiêu đề chương ===
+Nội dung chương 2...`;
+
+function ImportTab() {
+  const [novels, setNovels] = useState<SyncedNovelRow[]>([]);
+  // form tạo truyện
+  const [title, setTitle] = useState('');
+  const [author, setAuthor] = useState('');
+  const [desc, setDesc] = useState('');
+  const [cover, setCover] = useState('');
+  // nhập chương
+  const [selectedId, setSelectedId] = useState('');
+  const [bulk, setBulk] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [transProgress, setTransProgress] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const loadNovels = async () => {
+    try {
+      const sb = getSupabase();
+      const { data, error } = await sb
+        .from('synced_novels')
+        .select('*')
+        .eq('source_id', 'manual')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const list = (data ?? []) as SyncedNovelRow[];
+      setNovels(list);
+      setSelectedId((cur) => cur || list[0]?.id || '');
+    } catch (e) {
+      setMsg(`❌ ${e instanceof Error ? e.message : 'Không tải được danh sách truyện.'}`);
+    }
+  };
+  useEffect(() => {
+    void loadNovels();
+  }, []);
+
+  const parsed = parseChapters(bulk);
+
+  const createNovel = async () => {
+    if (busy) return;
+    if (!title.trim()) {
+      setMsg('❌ Nhập tên truyện.');
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const apiId = `${slugify(title)}-${Date.now()}`;
+      const id = `manual:${apiId}`;
+      const sb = getSupabase();
+      const { error } = await sb.from('synced_novels').insert({
+        id,
+        source_id: 'manual',
+        api_id: apiId,
+        title: title.trim(),
+        author: author.trim() || null,
+        description: desc.trim() || null,
+        cover_url: cover.trim() || null,
+        status: 'ongoing',
+        chapters_count: 0,
+        translated_count: 0,
+        synced_chapters: 0,
+      });
+      if (error) throw error;
+      setTitle('');
+      setAuthor('');
+      setDesc('');
+      setCover('');
+      setMsg('✅ Đã tạo truyện. Chọn truyện ở bước 2 để nhập chương.');
+      await loadNovels();
+      setSelectedId(id);
+    } catch (e) {
+      setMsg(`❌ ${e instanceof Error ? e.message : 'Tạo truyện thất bại.'}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const translateAll = async () => {
+    if (translating || saving) return;
+    const ps = parseChapters(bulk);
+    if (ps.length === 0) {
+      setMsg('❌ Không parse được chương nào. Kiểm tra lại format.');
+      return;
+    }
+    setTranslating(true);
+    setMsg(null);
+    try {
+      const done: ParsedChapter[] = [];
+      for (let i = 0; i < ps.length; i++) {
+        setTransProgress(`Đang dịch chương ${ps[i].num} (${i + 1}/${ps.length})...`);
+        const t = await translateText(ps[i].content);
+        done.push({ ...ps[i], content: t });
+      }
+      setBulk(formatChapters(done));
+      setMsg(
+        `✅ Đã dịch xong ${done.length} chương — kiểm tra/sửa lại nội dung rồi bấm "💾 Lưu vào database".`,
+      );
+    } catch (e) {
+      setMsg(`❌ ${e instanceof Error ? e.message : 'Dịch thất bại.'}`);
+    } finally {
+      setTranslating(false);
+      setTransProgress(null);
+    }
+  };
+
+  const saveChapters = async () => {
+    if (saving || translating) return;
+    if (!selectedId) {
+      setMsg('❌ Chọn truyện ở bước 2.');
+      return;
+    }
+    const ps = parseChapters(bulk);
+    if (ps.length === 0) {
+      setMsg('❌ Không parse được chương nào.');
+      return;
+    }
+    setSaving(true);
+    setMsg(null);
+    try {
+      const sb = getSupabase();
+      for (const c of ps) {
+        const { error } = await sb.from('synced_chapters').upsert(
+          { novel_id: selectedId, chapter_number: c.num, title: c.title, content: c.content },
+          { onConflict: 'novel_id,chapter_number' },
+        );
+        if (error) throw error;
+      }
+      const { data: all } = await sb
+        .from('synced_chapters')
+        .select('chapter_number')
+        .eq('novel_id', selectedId);
+      const nums = ((all ?? []) as { chapter_number: number }[]).map((r) => r.chapter_number);
+      const maxNum = nums.length ? Math.max(...nums) : 0;
+      await sb
+        .from('synced_novels')
+        .update({
+          synced_chapters: nums.length,
+          translated_count: maxNum,
+          chapters_count: maxNum,
+          last_synced_at: new Date().toISOString(),
+        })
+        .eq('id', selectedId);
+      setMsg(`✅ Đã lưu ${ps.length} chương vào database.`);
+      await loadNovels();
+    } catch (e) {
+      setMsg(`❌ ${e instanceof Error ? e.message : 'Lưu thất bại.'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeNovel = async (n: SyncedNovelRow) => {
+    if (!window.confirm(`Xóa truyện "${n.title}" và toàn bộ chương đã lưu?`)) return;
+    const sb = getSupabase();
+    await sb.from('synced_novels').delete().eq('id', n.id);
+    if (selectedId === n.id) setSelectedId('');
+    await loadNovels();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className={card}>
+        <p className="font-bold text-stone-900 dark:text-stone-100">📖 Bước 1 — Tạo truyện</p>
+        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+          Chỉ nhập nội dung bạn có quyền sử dụng (truyện tự sáng tác, bản dịch của bạn, hoặc tác
+          phẩm miễn phí/không bản quyền).
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <input
+            className={inputCls}
+            placeholder="Tên truyện *"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <input
+            className={inputCls}
+            placeholder="Tác giả"
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+          />
+          <input
+            className={`${inputCls} sm:col-span-2`}
+            placeholder="Link ảnh bìa (tùy chọn)"
+            value={cover}
+            onChange={(e) => setCover(e.target.value)}
+          />
+          <textarea
+            className={`${inputCls} min-h-20 sm:col-span-2`}
+            placeholder="Mô tả truyện (tùy chọn)"
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+          />
+        </div>
+        <button onClick={() => void createNovel()} disabled={busy} className={`${btnPrimary} mt-3`}>
+          {busy ? 'Đang tạo...' : '➕ Tạo truyện'}
+        </button>
+      </div>
+
+      <div className={card}>
+        <p className="font-bold text-stone-900 dark:text-stone-100">📝 Bước 2 — Nhập chương</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            className={`${inputCls} max-w-xs`}
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+          >
+            <option value="">— Chọn truyện —</option>
+            {novels.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.title} ({n.synced_chapters} chương đã lưu)
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-stone-500 dark:text-stone-400">
+            {parsed.length > 0
+              ? `Đã nhận diện ${parsed.length} chương: ${parsed
+                  .slice(0, 6)
+                  .map((c) => c.num)
+                  .join(', ')}${parsed.length > 6 ? '…' : ''}`
+              : 'Dán nhiều chương theo format bên dưới'}
+          </span>
+        </div>
+        <pre className="mt-2 overflow-x-auto rounded-xl bg-stone-100 p-3 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+          {CHAPTER_FORMAT_HINT}
+        </pre>
+        <textarea
+          className={`${inputCls} mt-2 min-h-64 font-mono`}
+          placeholder="Dán nội dung các chương theo format trên..."
+          value={bulk}
+          onChange={(e) => setBulk(e.target.value)}
+        />
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            onClick={() => void translateAll()}
+            disabled={translating || saving || parsed.length === 0}
+            className={btnPrimary}
+          >
+            {translating ? '⏳ Đang dịch...' : '🤖 Dịch tất cả bằng Gemini'}
+          </button>
+          <button
+            onClick={() => void saveChapters()}
+            disabled={saving || translating || parsed.length === 0 || !selectedId}
+            className={btnPrimary}
+          >
+            {saving ? '⏳ Đang lưu...' : '💾 Lưu vào database'}
+          </button>
+        </div>
+        {transProgress && (
+          <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">{transProgress}</p>
+        )}
+        {msg && <p className="mt-2 text-sm">{msg}</p>}
+        <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
+          💡 Dịch xong nội dung sẽ hiện lại trong ô trên để bạn kiểm tra/sửa trước khi lưu. Nút
+          dịch chống bấm đúp; mỗi lần dịch nên kiểm tra key còn quota trong tab 🤖 Gemini.
+        </p>
+      </div>
+
+      <div className={card}>
+        <p className="font-bold text-stone-900 dark:text-stone-100">
+          📚 Truyện đã nhập tay ({novels.length})
+        </p>
+        <div className="mt-3 space-y-2">
+          {novels.map((n) => (
+            <div
+              key={n.id}
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-900/10 bg-amber-50/50 px-3 py-2 text-sm dark:border-amber-100/10 dark:bg-stone-800/60"
+            >
+              <span className="font-bold">{n.title}</span>
+              <span className="text-xs text-stone-500 dark:text-stone-400">
+                {n.synced_chapters} chương đã lưu
+              </span>
+              <span className="ml-auto">
+                <button onClick={() => void removeNovel(n)} className={btnGhost} title="Xóa truyện">
+                  🗑
+                </button>
+              </span>
+            </div>
+          ))}
+          {novels.length === 0 && (
+            <p className="py-4 text-center text-sm italic text-stone-500 dark:text-stone-400">
+              Chưa có truyện nào. Tạo truyện ở bước 1.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Admin chính ---------------- */
 export default function Admin() {
   const { isAdmin, profile } = useAuth();
@@ -1220,6 +1776,8 @@ export default function Admin() {
         {tab === 'users' && <UsersTab />}
         {tab === 'sources' && <SourcesTab />}
         {tab === 'sync' && <SyncTab />}
+        {tab === 'gemini' && <GeminiTab />}
+        {tab === 'import' && <ImportTab />}
         {tab === 'thumbnails' && <ThumbnailsTab />}
         {tab === 'items' && <ItemsTab />}
         {tab === 'defaults' && <DefaultsTab />}
