@@ -90,16 +90,13 @@ function drawOrnament(ctx: CanvasRenderingContext2D, y: number) {
   ctx.restore();
 }
 
-/** Vẽ bìa, trả về Blob PNG. */
-export async function generateCover(title: string, author?: string | null): Promise<Blob> {
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Trình duyệt không hỗ trợ canvas.');
-
-  drawBackground(ctx);
-
+/** Vẽ khối tên truyện (cỡ lớn) + tên tác giả (nhỏ hơn) + chữ ký. */
+function drawTitleBlock(
+  ctx: CanvasRenderingContext2D,
+  title: string,
+  author: string | null | undefined,
+  centerRatio = 0.4,
+) {
   const maxWidth = W - 160;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -114,7 +111,7 @@ export async function generateCover(title: string, author?: string | null): Prom
     lines = wrapLines(ctx, title.trim(), maxWidth);
   }
   const titleBlockH = lines.length * titleSize * 1.28;
-  const titleY = H * 0.40 - titleBlockH / 2;
+  const titleY = H * centerRatio - titleBlockH / 2;
 
   const gold = ctx.createLinearGradient(0, titleY, 0, titleY + titleBlockH);
   gold.addColorStop(0, '#ffe9a8');
@@ -146,10 +143,104 @@ export async function generateCover(title: string, author?: string | null): Prom
   ctx.font = '28px Georgia, serif';
   ctx.fillStyle = 'rgba(233, 220, 195, 0.55)';
   ctx.fillText('· MÊ TRUYỆN ·', W / 2, H - 120);
+}
+
+/** Vẽ bìa, trả về Blob PNG. */
+export async function generateCover(title: string, author?: string | null): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Trình duyệt không hỗ trợ canvas.');
+
+  drawBackground(ctx);
+  drawTitleBlock(ctx, title, author, 0.4);
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
   if (!blob) throw new Error('Xuất ảnh thất bại.');
   return blob;
+}
+
+function buildAIPrompt(title: string): string {
+  // Prompt tiếng Anh cho model hiểu tốt; KHÔNG yêu cầu vẽ chữ (AI vẽ chữ kém,
+  // nhất là tiếng Việt) — chữ sẽ do canvas vẽ đè lên.
+  const clean = title
+    .replace(/[^\p{L}\p{N}\s:·—–-]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+  return (
+    `Epic chinese xianxia fantasy novel cover illustration inspired by "${clean}": ` +
+    `majestic misty mountains, a lone swordsman flying on a sword among glowing clouds, ` +
+    `swirling spiritual energy, dramatic cinematic lighting, vibrant colors, ` +
+    `highly detailed digital painting, no text, no watermark, no signature`
+  );
+}
+
+function loadImage(blob: Blob): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => {
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Đọc ảnh AI thất bại.'));
+    };
+    img.src = url;
+  });
+}
+
+/**
+ * Tạo thumbnail bằng ảnh AI (Pollinations.ai — miễn phí, không cần API key)
+ * làm nền, chữ tên truyện/tác giả do canvas vẽ đè lên cho sắc nét.
+ * Có thể mất 10–30 giây tùy tải của dịch vụ AI.
+ */
+export async function generateAICover(title: string, author?: string | null): Promise<Blob> {
+  const seed = Math.floor(Math.random() * 1_000_000_000);
+  const url =
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(buildAIPrompt(title))}` +
+    `?width=${W}&height=${H}&nologo=true&seed=${seed}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`AI image HTTP ${res.status}`);
+  const blob = await res.blob();
+  if (!blob.type.startsWith('image/')) throw new Error('AI không trả về ảnh.');
+  const img = await loadImage(blob);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Trình duyệt không hỗ trợ canvas.');
+
+  // cover-fit ảnh AI
+  const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+  const dw = img.naturalWidth * scale;
+  const dh = img.naturalHeight * scale;
+  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+
+  // làm tối nửa dưới để chữ nổi bật
+  const shade = ctx.createLinearGradient(0, H * 0.3, 0, H);
+  shade.addColorStop(0, 'rgba(10,6,20,0)');
+  shade.addColorStop(1, 'rgba(10,6,20,0.75)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 0, W, H);
+
+  drawTitleBlock(ctx, title, author, 0.62);
+
+  // khung viền vàng đôi
+  ctx.strokeStyle = '#d4af37';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(28, 28, W - 56, H - 56);
+  ctx.lineWidth = 3;
+  ctx.strokeRect(52, 52, W - 104, H - 104);
+
+  const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!out) throw new Error('Xuất ảnh thất bại.');
+  return out;
 }
 
 /** Upload blob lên bucket `covers`, trả về public URL. */

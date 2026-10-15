@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getSupabase, getSupabaseUrl } from '../lib/supabase';
 import { fetchOpenApiInfo, fetchNovels } from '../lib/novelApi';
 import type { ApiSourceRow, NovelSummary } from '../lib/novelApi';
-import { generateCover, uploadCover } from '../components/CoverGenerator';
+import { generateCover, generateAICover, uploadCover } from '../components/CoverGenerator';
 import type { CosmeticItem } from '../components/Treasury';
 import { useAuth } from '../context/AuthContext';
 
@@ -408,10 +408,21 @@ function NovelThumbRow({
   const genAI = async () => {
     setBusy(true);
     try {
-      const blob = await generateCover(novel.title, novel.author);
+      // Ưu tiên ảnh AI (Pollinations, miễn phí); bận/lỗi thì dùng bản vẽ canvas
+      let blob: Blob;
+      let usedFallback = false;
+      try {
+        blob = await generateAICover(novel.title, novel.author);
+      } catch {
+        usedFallback = true;
+        blob = await generateCover(novel.title, novel.author);
+      }
       const publicUrl = await uploadCover(blob, novel.sourceId, novel.id);
       setUrl(publicUrl);
       await save(publicUrl);
+      if (usedFallback) {
+        alert('AI đang bận nên đã tạo bìa bằng bản vẽ canvas. Thử lại sau để dùng ảnh AI nhé.');
+      }
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Tạo thumbnail thất bại.');
     } finally {
