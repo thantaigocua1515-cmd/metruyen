@@ -131,6 +131,19 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
     return nx ? nx.number : null;
   })();
 
+  // DEBUG tạm thời cho vụ chương 320 — sẽ gỡ sau khi tìm ra nguyên nhân
+  useEffect(() => {
+    console.log('[ReaderDebug]', {
+      startChapter,
+      blocks: blocks.map((b) => b.num),
+      lastNum,
+      nextNum,
+      ended,
+      chaptersCount: chapters.length,
+      loading,
+    });
+  });
+
   // Cuộn tới gần cuối → tự tải chương tiếp theo
   useEffect(() => {
     const el = sentinelRef.current;
