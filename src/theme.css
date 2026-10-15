@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+/* Dark mode theo class .dark trên <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --font-display: "Georgia", "Times New Roman", "Noto Serif", serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Chữ tiêu đề phong cách thư các */
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Nội dung chương truyện */
+.chapter-content p {
+  margin-bottom: 1.1em;
+  line-height: 1.9;
+  text-align: justify;
+}
+
+/* Scrollbar mảnh */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.45);
+  border-radius: 8px;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.6);
+}
+
+/* Hiệu ứng fade-in cho card */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fadeUp 0.35s ease-out both;
+}
+
+/* Giới hạn 2 dòng chữ */
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
