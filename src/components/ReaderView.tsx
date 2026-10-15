@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchChapterContent } from '../lib/novelApi';
 import type { ApiSourceRow, ChapterMeta, NovelSummary } from '../lib/novelApi';
+import { getSyncedChapter } from '../lib/library';
 import { getSupabase } from '../lib/supabase';
 
 interface Block {
@@ -74,11 +75,24 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
       setLoading(true);
       setError(null);
       try {
-        const content = await fetchChapterContent(source, novel.id, num);
+        // Ưu tiên nội dung từ database đã đồng bộ, fallback về API
+        let content: string;
+        let dbTitle: string | undefined;
+        try {
+          const synced = await getSyncedChapter(`${source.id}:${novel.id}`, num);
+          if (synced) {
+            content = synced.content;
+            dbTitle = synced.title?.trim() || undefined;
+          } else {
+            content = await fetchChapterContent(source, novel.id, num);
+          }
+        } catch {
+          content = await fetchChapterContent(source, novel.id, num);
+        }
         const meta = chapters.find((c) => c.number === num);
         setBlocks((prev) => {
           if (prev.some((b) => b.num === num)) return prev;
-          return [...prev, { num, title: meta?.title ?? `Chương ${num}`, content }].sort(
+          return [...prev, { num, title: dbTitle ?? meta?.title ?? `Chương ${num}`, content }].sort(
             (a, b) => a.num - b.num,
           );
         });

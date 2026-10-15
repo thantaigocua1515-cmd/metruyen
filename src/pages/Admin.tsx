@@ -1,20 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { getSupabase, getSupabaseUrl } from '../lib/supabase';
 import { fetchOpenApiInfo, fetchNovels } from '../lib/novelApi';
 import type { ApiSourceRow, NovelSummary } from '../lib/novelApi';
+import { syncNovelList, syncChapters, checkUpdates } from '../lib/sync';
+import { getSyncedNovels } from '../lib/library';
+import type { SyncedNovelRow } from '../lib/library';
 import { generateCover, generateAICover, uploadCover } from '../components/CoverGenerator';
 import type { CosmeticItem } from '../components/Treasury';
 import { useAuth } from '../context/AuthContext';
 import { useTemplate } from '../context/TemplateContext';
 import { TEMPLATES, getTemplateDef } from '../theme/templates';
 
-type Tab = 'overview' | 'users' | 'sources' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system';
+type Tab = 'overview' | 'users' | 'sources' | 'sync' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: '📊 Tổng quan' },
   { id: 'users', label: '👥 Người dùng' },
   { id: 'sources', label: '🔗 Nguồn API' },
+  { id: 'sync', label: '🔄 Đồng bộ' },
   { id: 'thumbnails', label: '🖼️ Thumbnail' },
   { id: 'items', label: '⚔️ Vật phẩm' },
   { id: 'defaults', label: '🌱 Nhân vật mới' },
@@ -967,6 +971,215 @@ function ThemeTab() {
   );
 }
 
+/* ---------------- Đồng bộ truyện từ API về database ---------------- */
+function SyncTab() {
+  const [sources, setSources] = useState<ApiSourceRow[]>([]);
+  const [sourceId, setSourceId] = useState('');
+  const [novels, setNovels] = useState<SyncedNovelRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [busyNovel, setBusyNovel] = useState<string | null>(null);
+  const [progress, setProgress] = useState<Record<string, string>>({});
+  const [summary, setSummary] = useState<string | null>(null);
+  const stopRef = useRef(false);
+
+  const loadSources = async () => {
+    const sb = getSupabase();
+    const { data } = await sb.from('api_sources').select('*').order('created_at');
+    const list = (data ?? []) as ApiSourceRow[];
+    setSources(list);
+    setSourceId((cur) => cur || list[0]?.id || '');
+  };
+  const loadNovels = async (sid: string) => {
+    try {
+      setNovels(await getSyncedNovels(sid));
+    } catch {
+      setNovels([]);
+    }
+  };
+  useEffect(() => {
+    void loadSources();
+  }, []);
+  useEffect(() => {
+    if (sourceId) void loadNovels(sourceId);
+  }, [sourceId]);
+
+  const src = sources.find((s) => s.id === sourceId) ?? null;
+  const fmtDate = (s: string | null) =>
+    s ? new Date(s).toLocaleString('vi-VN', { hour12: false }) : '—';
+
+  const doSyncList = async () => {
+    if (!src || busy) return;
+    setBusy(true);
+    setSummary(null);
+    try {
+      const r = await syncNovelList(src);
+      setSummary(
+        `⬇ Đồng bộ danh sách xong: ${r.added} truyện mới, ${r.updated} truyện cập nhật (tổng ${r.total} từ API)` +
+          (r.failed.length ? ` · ⚠️ ${r.failed.length} lỗi` : ''),
+      );
+      await loadNovels(src.id);
+    } catch (e) {
+      setSummary(`❌ ${e instanceof Error ? e.message : 'Lỗi không xác định.'}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doCheck = async () => {
+    if (!src || busy) return;
+    setBusy(true);
+    setSummary(null);
+    try {
+      const r = await checkUpdates(src);
+      const parts: string[] = [];
+      parts.push(
+        r.newNovels.length > 0 ? `truyện mới: ${r.newNovels.join(', ')}` : 'không có truyện mới',
+      );
+      parts.push(
+        r.updated.length > 0
+          ? `cập nhật: ${r.updated.map((u) => `${u.title} (+${u.newChapters} chương)`).join('; ')}`
+          : 'không có chương mới',
+      );
+      setSummary(
+        `🔍 Kiểm tra cập nhật xong — ${parts.join(' · ')}` +
+          (r.failed.length ? ` · ⚠️ ${r.failed.length} lỗi` : ''),
+      );
+      await loadNovels(src.id);
+    } catch (e) {
+      setSummary(`❌ ${e instanceof Error ? e.message : 'Lỗi không xác định.'}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doSyncChapters = async (row: SyncedNovelRow) => {
+    if (!src || busyNovel) return;
+    setBusyNovel(row.id);
+    stopRef.current = false;
+    setProgress((p) => ({ ...p, [row.id]: 'bắt đầu...' }));
+    try {
+      const r = await syncChapters(
+        src,
+        row.id,
+        (done, total, current) =>
+          setProgress((p) => ({ ...p, [row.id]: `${done}/${total} · chương ${current}` })),
+        () => stopRef.current,
+      );
+      setSummary(
+        `📥 "${row.title}": +${r.synced} chương mới` +
+          (r.skipped.length ? ` · bỏ qua ${r.skipped.length} chương lỗi` : '') +
+          (r.stopped ? ' · đã dừng' : ''),
+      );
+      await loadNovels(src.id);
+    } catch (e) {
+      setSummary(`❌ "${row.title}": ${e instanceof Error ? e.message : 'Lỗi.'}`);
+    } finally {
+      setBusyNovel(null);
+      setProgress((p) => {
+        const n = { ...p };
+        delete n[row.id];
+        return n;
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className={`${card} flex flex-wrap items-center gap-2`}>
+        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+          Nguồn API:
+        </label>
+        <select
+          value={sourceId}
+          onChange={(e) => setSourceId(e.target.value)}
+          className={`${inputCls} w-auto`}
+        >
+          {sources.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <button onClick={() => void doSyncList()} disabled={busy || !src} className={btnPrimary}>
+          {busy ? 'Đang chạy...' : '⬇ Đồng bộ danh sách truyện'}
+        </button>
+        <button onClick={() => void doCheck()} disabled={busy || !src} className={btnGhost}>
+          {busy ? 'Đang chạy...' : '🔍 Kiểm tra cập nhật'}
+        </button>
+      </div>
+
+      {summary && (
+        <p className="rounded-xl border border-amber-900/15 bg-amber-50 px-4 py-2 text-sm text-stone-700 dark:border-amber-100/10 dark:bg-stone-800 dark:text-stone-200">
+          {summary}
+        </p>
+      )}
+
+      <div className={card}>
+        <h3 className="font-bold text-stone-900 dark:text-stone-100">
+          📚 Truyện đã đồng bộ ({novels.length})
+        </h3>
+        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+          Bấm "Đồng bộ chương" để tải nội dung từng chương về database — tự bỏ qua chương đã
+          có, chương lỗi sẽ được bỏ qua và tiếp tục. Truyện dài 1000+ chương có thể mất vài
+          phút, cứ để tab mở.
+        </p>
+        <div className="mt-3 space-y-2">
+          {novels.map((n) => {
+            const total = n.translated_count || 0;
+            const done = Math.min(n.synced_chapters, total);
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            const running = busyNovel === n.id;
+            return (
+              <div
+                key={n.id}
+                className="rounded-xl border border-amber-900/10 p-3 dark:border-amber-100/10"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="min-w-0 flex-1 truncate font-semibold text-stone-900 dark:text-stone-100">
+                    {n.title}
+                  </p>
+                  {running ? (
+                    <button onClick={() => (stopRef.current = true)} className={btnGhost}>
+                      ⏹ Dừng
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => void doSyncChapters(n)}
+                      disabled={busyNovel !== null}
+                      className={btnPrimary}
+                    >
+                      ⬇ Đồng bộ chương
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-700">
+                    <div
+                      className="h-full rounded-full bg-amber-600 transition-all dark:bg-amber-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="whitespace-nowrap">
+                    {running && progress[n.id] ? progress[n.id] : `đã sync ${done}/${total} chương`}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
+                  Lần cuối: {fmtDate(n.last_synced_at)}
+                </p>
+              </div>
+            );
+          })}
+          {novels.length === 0 && (
+            <p className="py-6 text-center text-sm italic text-stone-500 dark:text-stone-400">
+              Chưa có truyện nào trong database. Bấm "⬇ Đồng bộ danh sách truyện" để bắt đầu.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------------- Admin chính ---------------- */
 export default function Admin() {
   const { isAdmin, profile } = useAuth();
@@ -1006,6 +1219,7 @@ export default function Admin() {
         {tab === 'overview' && <OverviewTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'sources' && <SourcesTab />}
+        {tab === 'sync' && <SyncTab />}
         {tab === 'thumbnails' && <ThumbnailsTab />}
         {tab === 'items' && <ItemsTab />}
         {tab === 'defaults' && <DefaultsTab />}

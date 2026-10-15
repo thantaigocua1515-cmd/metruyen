@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTemplate } from '../context/TemplateContext';
+import { useAuth } from '../context/AuthContext';
 import { useNovels } from '../lib/useNovels';
 import { GENRES, filterByGenre } from '../lib/genres';
 import NovelCard from '../components/NovelCard';
@@ -21,9 +22,31 @@ function ErrorBlock({ error }: { error: string }) {
   );
 }
 
+/** Gợi ý admin đồng bộ truyện về database (chỉ hiện khi còn nguồn đọc live). */
+function SyncHint({ liveSourceIds }: { liveSourceIds: string[] }) {
+  const { isAdmin } = useAuth();
+  if (!isAdmin || liveSourceIds.length === 0) return null;
+  return (
+    <p
+      className="mx-auto mb-4 max-w-2xl rounded-xl px-4 py-2 text-center text-xs"
+      style={{
+        background: 'var(--brand-soft)',
+        color: 'var(--muted)',
+        border: '1px solid color-mix(in srgb, var(--brand) 30%, transparent)',
+      }}
+    >
+      💡 Một số nguồn đang đọc trực tiếp từ API. Vào{' '}
+      <Link to="/admin" className="font-semibold underline" style={{ color: 'var(--brand)' }}>
+        Quản trị → 🔄 Đồng bộ
+      </Link>{' '}
+      để lưu truyện về database (đọc nhanh hơn, mục lục chính xác).
+    </p>
+  );
+}
+
 /** Trang chủ kiểu TruyenC: Truyện Hot + pills thể loại + lưới card 2 cột. */
 function TruyencHome() {
-  const { novels, overrides, loading, error } = useNovels();
+  const { novels, overrides, loading, error, liveSourceIds } = useNovels();
   const [genre, setGenre] = useState('all');
 
   const hot = useMemo(() => {
@@ -81,6 +104,8 @@ function TruyencHome() {
       {loading && <LoadingBlock />}
       {error && <ErrorBlock error={error} />}
 
+      {!loading && !error && <SyncHint liveSourceIds={liveSourceIds} />}
+
       {!loading && !error && hot.length === 0 && (
         <p className="py-16 text-center italic" style={{ color: 'var(--muted)' }}>
           Chưa có truyện nào. Admin hãy bật nguồn API trong Quản trị → Nguồn API.
@@ -104,7 +129,7 @@ function TruyencHome() {
 function DefaultHome() {
   const [searchParams] = useSearchParams();
   const q = (searchParams.get('q') ?? '').trim().toLowerCase();
-  const { novels, overrides, loading, error } = useNovels();
+  const { novels, overrides, loading, error, liveSourceIds } = useNovels();
 
   const filtered = useMemo(() => {
     if (!q) return novels;
@@ -136,6 +161,8 @@ function DefaultHome() {
 
       {loading && <LoadingBlock />}
       {error && <ErrorBlock error={error} />}
+
+      {!loading && !error && <SyncHint liveSourceIds={liveSourceIds} />}
 
       {!loading && !error && filtered.length === 0 && (
         <p className="py-16 text-center italic" style={{ color: 'var(--muted)' }}>

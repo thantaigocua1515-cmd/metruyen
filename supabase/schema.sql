@@ -384,3 +384,63 @@ on conflict (key) do nothing;
 
 -- realtime: đổi template trong admin → áp dụng ngay mọi máy
 alter publication supabase_realtime add table public.site_settings;
+
+-- 20. Đồng bộ truyện: synced_novels + synced_chapters ------------------------------
+-- Lần đầu: kéo metadata + nội dung chương từ API về DB.
+-- Sau này: "Kiểm tra cập nhật" chỉ lấy truyện mới / chương mới. Web ưu tiên đọc DB.
+create table if not exists public.synced_novels (
+  id text primary key,                       -- ${source_id}:${api_id}
+  source_id text not null,
+  api_id text not null,
+  title text not null default '',
+  author text,
+  description text,
+  cover_url text,
+  status text,
+  chapters_count int not null default 0,
+  translated_count int not null default 0,    -- số chương đọc được theo API
+  synced_chapters int not null default 0,     -- số chương đã lưu nội dung vào DB
+  last_synced_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists synced_novels_source_idx on public.synced_novels (source_id);
+
+create table if not exists public.synced_chapters (
+  novel_id text not null references public.synced_novels (id) on delete cascade,
+  chapter_number int not null,
+  title text not null default '',
+  content text not null default '',
+  synced_at timestamptz not null default now(),
+  primary key (novel_id, chapter_number)
+);
+
+alter table public.synced_novels enable row level security;
+alter table public.synced_chapters enable row level security;
+
+-- ai cũng đọc được (web đọc truyện công khai từ DB)
+drop policy if exists synced_novels_public_read on public.synced_novels;
+create policy synced_novels_public_read on public.synced_novels
+  for select using (true);
+drop policy if exists synced_chapters_public_read on public.synced_chapters;
+create policy synced_chapters_public_read on public.synced_chapters
+  for select using (true);
+
+-- chỉ admin được ghi
+drop policy if exists synced_novels_admin_write on public.synced_novels;
+create policy synced_novels_admin_write on public.synced_novels
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+drop policy if exists synced_chapters_admin_write on public.synced_chapters;
+create policy synced_chapters_admin_write on public.synced_chapters
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- quyền (bảng tạo sau mục 16 nên cần grant riêng)
+grant select on public.synced_novels, public.synced_chapters to anon;
+grant all on public.synced_novels, public.synced_chapters to authenticated;
+
+-- realtime
+alter publication supabase_realtime add table public.synced_novels;
+alter publication supabase_realtime add table public.synced_chapters;

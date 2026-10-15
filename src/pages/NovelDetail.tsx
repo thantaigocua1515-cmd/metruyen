@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getSupabase } from '../lib/supabase';
 import { fetchNovelDetail } from '../lib/novelApi';
 import type { ApiSourceRow, NovelDetail as NovelDetailType } from '../lib/novelApi';
+import { getSyncedNovelChapterList } from '../lib/library';
 import { useAuth } from '../context/AuthContext';
 
 const PAGE_SIZE = 80;
@@ -19,6 +20,7 @@ export default function NovelDetail() {
   const [inShelf, setInShelf] = useState(false);
   const [showCount, setShowCount] = useState(PAGE_SIZE);
   const [jump, setJump] = useState('');
+  const [fromDb, setFromDb] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -36,6 +38,19 @@ export default function NovelDetail() {
         if (sErr || !sRow) throw new Error('Không tìm thấy nguồn truyện.');
         const src = sRow as ApiSourceRow;
         const d = await fetchNovelDetail(src, novelId);
+        // Ưu tiên mục lục THẬT từ database đã đồng bộ (tiêu đề chương thật,
+        // chính xác hơn danh sách ảo sinh từ số lượng)
+        let db = false;
+        try {
+          const syncedList = await getSyncedNovelChapterList(`${sourceId}:${novelId}`);
+          if (syncedList.length > 0) {
+            d.chapters = syncedList;
+            d.chaptersVirtual = false;
+            db = true;
+          }
+        } catch {
+          /* bảng chưa có / lỗi DB → dùng mục lục API như cũ */
+        }
         const { data: ov } = await supabase
           .from('thumbnail_overrides')
           .select('thumbnail_url')
@@ -64,6 +79,7 @@ export default function NovelDetail() {
         }
         if (alive) {
           setDetail(d);
+          setFromDb(db);
           setOverrideCover((ov as { thumbnail_url: string } | null)?.thumbnail_url ?? null);
           setContinueChapter(cont);
           setInShelf(shelf);
@@ -185,6 +201,11 @@ export default function NovelDetail() {
 
       <h2 className="font-display mt-8 text-xl font-bold text-amber-950 dark:text-amber-100">
         📜 Mục lục ({detail.chapters.length} chương)
+        {fromDb && (
+          <span className="ml-2 align-middle text-xs font-normal text-stone-500 dark:text-stone-400">
+            📦 từ database đã đồng bộ
+          </span>
+        )}
       </h2>
       <div className="mt-2 flex gap-2">
         <input

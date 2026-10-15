@@ -66,7 +66,8 @@ Vì dùng HashRouter nên không cần cấu hình rewrite gì thêm — mở l�
   Đại, Dạ Huyền Ảo, Cổ Phong, Tối Giản — đổi trong admin, áp dụng realtime.
 - **Admin panel** (chỉ hiện với role admin): Tổng quan, Người dùng (sửa role,
   cộng/trừ giờ đọc & linh thạch, xóa), Nguồn API (thêm/sửa/bật-tắt link
-  openapi + nút Kiểm tra), Thumbnail (đổi URL hoặc **tạo bằng AI** vẽ tên
+  openapi + nút Kiểm tra), **Đồng bộ** (kéo truyện từ API về database của
+  mình — xem mục 7), Thumbnail (đổi URL hoặc **tạo bằng AI** vẽ tên
   truyện + tên tác giả lên bìa), Vật phẩm (tải khung/pháp bảo có xem trước
   và chỉnh scale/offset), Nhân vật mới (linh thạch/giờ tu luyện/vật phẩm
   tặng sẵn cho tài khoản mới), **Giao diện** (chọn template), Hệ thống
@@ -78,9 +79,11 @@ Vì dùng HashRouter nên không cần cấu hình rewrite gì thêm — mở l�
 supabase/schema.sql      schema Postgres đầy đủ (bảng + RLS + trigger + storage)
 src/lib/supabase.ts      khởi tạo Supabase client từ env
 src/lib/novelApi.ts       client NovelFlow/OpenAPI (nhiều nguồn, gộp danh sách)
+src/lib/sync.ts           sync engine: kéo truyện/chương từ API về DB
+src/lib/library.ts        đọc truyện đã đồng bộ từ DB (ưu tiên DB, fallback API)
 src/lib/tuvi.ts           thang 15 cảnh giới tu vi
 src/lib/genres.ts         đoán thể loại bằng keyword (heuristic — API chưa có trường này)
-src/lib/useNovels.ts      hook tải truyện dùng chung (Home/Search/Genres)
+src/lib/useNovels.ts      hook tải truyện dùng chung (Home/Search/Genres) — ưu tiên DB
 src/theme/templates.ts    registry 5 template giao diện
 src/context/             AuthContext (username/password), ThemeContext (light/dark),
                          TemplateContext (template hiện tại, realtime qua site_settings)
@@ -114,3 +117,33 @@ realtime tới mọi máy đang mở web):
   (+ `.dark[data-template="<id>"]`) trong `src/theme.css`; (3) nếu cần layout
   riêng, rẽ nhánh theo `useTemplate()` trong component (xem `NovelCard`,
   `Navbar`, `Home` làm mẫu).
+
+## 7. Module Đồng bộ truyện 🔄
+
+Kéo truyện từ API nguồn về database Supabase của mình để web tự chủ dữ liệu
+(đọc nhanh hơn, không phụ thuộc API, mục lục chính xác bằng tiêu đề chương
+thật thay vì đoán).
+
+**Luồng dùng (Quản trị → tab 🔄 Đồng bộ):**
+
+1. **Lần đầu:** chọn nguồn API → "⬇ Đồng bộ danh sách truyện" (lưu metadata
+   toàn bộ truyện) → bấm "Đồng bộ chương" từng truyện (lưu nội dung từng
+   chương, có thanh tiến độ `X/Y`).
+2. **Sau này:** "🔍 Kiểm tra cập nhật" → tự phát hiện truyện mới (lưu
+   metadata) và chương mới (chỉ tải các chương mới, không tải lại).
+
+**Tính chất:**
+
+- **Resume:** chương nào đã có trong DB thì bỏ qua, chạy tiếp phần còn thiếu
+  (tắt tab giữa chừng, mở lại bấm tiếp vẫn ổn).
+- **Bỏ qua chương lỗi:** chương nào lỗi (404, timeout...) được ghi nhận và
+  tiếp tục chương sau — không dừng cả quá trình. Kết quả báo số chương bỏ
+  qua.
+- **Lịch sự với API:** tải tuần tự từng chương, nghỉ ~150ms giữa các request.
+- **Ưu tiên DB:** Home/Detail/Reader đọc từ DB trước, chưa đồng bộ thì tự
+  fallback về API. Nút "⏹ Dừng" để ngắt giữa chừng.
+- Truyện dài 1000+ chương có thể mất vài phút — cứ để tab mở.
+
+**Bảng:** `synced_novels` (metadata, khóa `${source_id}:${api_id}`) và
+`synced_chapters` (nội dung, khóa `(novel_id, chapter_number)`). Ai cũng đọc
+được, chỉ admin ghi được (RLS + `is_admin()`).
