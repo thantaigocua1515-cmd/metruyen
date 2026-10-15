@@ -42,6 +42,8 @@ export interface ChapterMeta {
 
 export interface NovelDetail extends NovelSummary {
   chapters: ChapterMeta[];
+  /** true khi danh sách chương do client tự sinh (API không trả mục lục) */
+  chaptersVirtual?: boolean;
 }
 
 function stripTrailingSlash(s: string): string {
@@ -139,13 +141,27 @@ export async function fetchNovelDetail(source: ApiSourceRow, novelId: string): P
   const rawChapters = asArray<Record<string, unknown>>(
     data.chapters ?? data.chapterList ?? data.chapter_list ?? [],
   );
-  const chapters: ChapterMeta[] = rawChapters
+  let chapters: ChapterMeta[] = rawChapters
     .map((c, i) => {
       const num = pickChapterNumber(c) || i + 1;
       return { number: num, title: pickChapterTitle(c, num) };
     })
     .sort((a, b) => a.number - b.number);
-  return { ...novel, chapters };
+  // API NovelFlow không trả mục lục (chapters: []) — tự sinh danh sách ảo
+  // theo số chương đọc được để cuộn vô hạn + mục lục vẫn hoạt động.
+  let chaptersVirtual = false;
+  if (chapters.length === 0) {
+    const total =
+      toNumber(data.translatedChaptersCount) || toNumber(data.chaptersCount);
+    if (total > 0) {
+      chaptersVirtual = true;
+      chapters = Array.from({ length: total }, (_, i) => ({
+        number: i + 1,
+        title: `Chương ${i + 1}`,
+      }));
+    }
+  }
+  return { ...novel, chapters, chaptersVirtual };
 }
 
 /** Lấy nội dung 1 chương (ưu tiên bản dịch). */

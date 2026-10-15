@@ -41,6 +41,7 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ended, setEnded] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
   loadingRef.current = loading;
@@ -83,7 +84,14 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
         });
         void saveProgress(num);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Tải chương thất bại.');
+        const msg = e instanceof Error ? e.message : 'Tải chương thất bại.';
+        if (/\b404\b/.test(msg)) {
+          // API không còn chương tiếp theo → coi như hết truyện
+          setEnded(true);
+          setError(null);
+        } else {
+          setError(msg);
+        }
       } finally {
         setLoading(false);
       }
@@ -102,6 +110,7 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
   // Số chương tiếp theo cần tải
   const lastNum = blocks.length ? Math.max(...blocks.map((b) => b.num)) : startChapter - 1;
   const nextNum: number | null = (() => {
+    if (ended) return null;
     const nx = chapters
       .filter((c) => c.number > lastNum)
       .sort((a, b) => a.number - b.number)[0];
@@ -167,9 +176,14 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
 
       <div ref={sentinelRef} className="py-8 text-center">
         {loading && <p className="text-sm text-stone-500 dark:text-stone-400">📖 Đang nối chương tiếp theo...</p>}
-        {!loading && nextNum === null && blocks.length > 0 && (
+        {!loading && (ended || nextNum === null) && blocks.length > 0 && (
           <p className="text-sm italic text-stone-500 dark:text-stone-400">
-            — Hết chương (hoặc API chưa có chương tiếp theo) —
+            — Hết chương —
+          </p>
+        )}
+        {!loading && ended && blocks.length === 0 && !error && (
+          <p className="text-sm italic text-stone-500 dark:text-stone-400">
+            API chưa có nội dung chương này.
           </p>
         )}
       </div>
