@@ -65,6 +65,12 @@ export function useNovels() {
             }
           }
         }
+        // Truyện nhập tay (source_id='manual') — không thuộc api_sources
+        const manualRows = bySource.get('manual') ?? [];
+        if (manualRows.length > 0) {
+          all.push(...manualRows.map((r) => syncedRowToSummary(r, '📝 Nhập tay')));
+          syncedIds.push('manual');
+        }
         const { data: ov } = await supabase
           .from('thumbnail_overrides')
           .select('source_id,novel_id,thumbnail_url');

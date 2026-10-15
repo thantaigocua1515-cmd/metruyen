@@ -242,6 +242,8 @@ export interface CheckUpdatesResult {
 }
 
 export async function checkUpdates(source: ApiSourceRow): Promise<CheckUpdatesResult> {
+  // Truyện nhập tay không có API để kiểm tra → bỏ qua
+  if (source.id === 'manual') return { newNovels: [], updated: [], failed: [] };
   const supabase = getSupabase();
   const list = await fetchNovels(source);
   const { data: rows } = await supabase

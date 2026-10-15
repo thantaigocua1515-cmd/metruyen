@@ -91,7 +91,8 @@ function drawOrnament(ctx: CanvasRenderingContext2D, y: number) {
 }
 
 /** Vẽ khối tên truyện (cỡ lớn) + tên tác giả (nhỏ hơn) + chữ ký. */
-function drawTitleBlock(
+/** Vẽ khối tên truyện + tác giả lên canvas (tái sử dụng cho mọi nguồn ảnh AI). */
+export function drawTitleBlock(
   ctx: CanvasRenderingContext2D,
   title: string,
   author: string | null | undefined,
@@ -177,7 +178,8 @@ function buildAIPrompt(title: string): string {
   );
 }
 
-function loadImage(blob: Blob): Promise<HTMLImageElement> {
+/** Đọc Blob ảnh thành HTMLImageElement. */
+export function loadImage(blob: Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const img = new Image();
@@ -199,17 +201,12 @@ function loadImage(blob: Blob): Promise<HTMLImageElement> {
  * làm nền, chữ tên truyện/tác giả do canvas vẽ đè lên cho sắc nét.
  * Có thể mất 10–30 giây tùy tải của dịch vụ AI.
  */
-export async function generateAICover(title: string, author?: string | null): Promise<Blob> {
-  const seed = Math.floor(Math.random() * 1_000_000_000);
-  const url =
-    `https://image.pollinations.ai/prompt/${encodeURIComponent(buildAIPrompt(title))}` +
-    `?width=${W}&height=${H}&nologo=true&seed=${seed}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`AI image HTTP ${res.status}`);
-  const blob = await res.blob();
-  if (!blob.type.startsWith('image/')) throw new Error('AI không trả về ảnh.');
-  const img = await loadImage(blob);
-
+/** Ghép ảnh nền AI + chữ tên truyện/tác giả + khung vàng → Blob PNG 768x1152. */
+export async function composeAICover(
+  img: HTMLImageElement,
+  title: string,
+  author?: string | null,
+): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -241,6 +238,19 @@ export async function generateAICover(title: string, author?: string | null): Pr
   const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
   if (!out) throw new Error('Xuất ảnh thất bại.');
   return out;
+}
+
+export async function generateAICover(title: string, author?: string | null): Promise<Blob> {
+  const seed = Math.floor(Math.random() * 1_000_000_000);
+  const url =
+    `https://image.pollinations.ai/prompt/${encodeURIComponent(buildAIPrompt(title))}` +
+    `?width=${W}&height=${H}&nologo=true&seed=${seed}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`AI image HTTP ${res.status}`);
+  const blob = await res.blob();
+  if (!blob.type.startsWith('image/')) throw new Error('AI không trả về ảnh.');
+  const img = await loadImage(blob);
+  return composeAICover(img, title, author);
 }
 
 /** Upload blob lên bucket `covers`, trả về public URL. */
