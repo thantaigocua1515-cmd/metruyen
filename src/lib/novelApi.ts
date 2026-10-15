@@ -150,19 +150,18 @@ export async function fetchNovelDetail(source: ApiSourceRow, novelId: string): P
       return { number: num, title: pickChapterTitle(c, num) };
     })
     .sort((a, b) => a.number - b.number);
-  // API NovelFlow không trả mục lục (chapters: []) — tự sinh danh sách ảo
-  // theo số chương đọc được để cuộn vô hạn + mục lục vẫn hoạt động.
+  // API NovelFlow đang crawl ("status":"crawling") nên mảng chapters có thể RỖNG
+  // hoặc THIẾU (mới crawl được 1 phần). Luôn bù đủ tới translatedChaptersCount
+  // để cuộn vô hạn + mục lục không bị dừng sớm ở chương cuối của danh sách thiếu.
   let chaptersVirtual = false;
-  if (chapters.length === 0) {
-    const total =
-      toNumber(data.translatedChaptersCount) || toNumber(data.chaptersCount);
-    if (total > 0) {
-      chaptersVirtual = true;
-      chapters = Array.from({ length: total }, (_, i) => ({
-        number: i + 1,
-        title: `Chương ${i + 1}`,
-      }));
+  const total = toNumber(data.translatedChaptersCount) || toNumber(data.chaptersCount);
+  if (total > chapters.length) {
+    chaptersVirtual = chapters.length === 0;
+    const have = new Set(chapters.map((c) => c.number));
+    for (let n = 1; n <= total; n++) {
+      if (!have.has(n)) chapters.push({ number: n, title: `Chương ${n}` });
     }
+    chapters.sort((a, b) => a.number - b.number);
   }
   return { ...novel, chapters, chaptersVirtual };
 }

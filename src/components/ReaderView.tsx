@@ -131,9 +131,6 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
     return nx ? nx.number : null;
   })();
 
-  // DEBUG tạm thời cho vụ chương 320 — hiển thị trực tiếp trên trang, sẽ gỡ sau
-  const debugText = `startChapter=${startChapter} blocks=[${blocks.map((b) => b.num).join(',')}] lastNum=${lastNum} nextNum=${String(nextNum)} ended=${String(ended)} chapters=${chapters.length} loading=${String(loading)}`;
-
   // Cuộn tới gần cuối → tự tải chương tiếp theo
   useEffect(() => {
     const el = sentinelRef.current;
@@ -155,10 +152,6 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
       <h1 className="font-display text-center text-2xl font-bold text-amber-950 dark:text-amber-100">
         {novel.title}
       </h1>
-      {/* DEBUG tạm thời — sẽ gỡ */}
-      <p data-debug="reader" className="mt-2 rounded bg-red-100 p-2 text-center font-mono text-xs text-red-800">
-        DEBUG: {debugText}
-      </p>
       {novel.author && (
         <p className="mt-1 text-center text-sm text-stone-500 dark:text-stone-400">
           Tác giả: {novel.author}
