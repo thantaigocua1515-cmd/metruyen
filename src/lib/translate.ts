@@ -210,7 +210,7 @@ export async function translateText(
 
 /* ---------------- Thumbnail AI bằng Gemini ---------------- */
 
-const GEMINI_IMAGE_MODEL = 'gemini-2.0-flash-preview-image-generation';
+const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image'; // model tạo ảnh hiện tại (Nano Banana 2)
 const IMAGE_REQUEST_TIMEOUT_MS = 120000;
 
 function buildCoverImagePrompt(title: string): string {
