@@ -8,18 +8,22 @@ import { getSyncedNovels } from '../lib/library';
 import type { SyncedNovelRow } from '../lib/library';
 import { testGeminiKey, translateText, generateGeminiCover, getActiveKeys } from '../lib/translate';
 import { generateCover, generateAICover, uploadCover } from '../components/CoverGenerator';
+import ChapterManager from '../components/admin/ChapterManager';
+import GlossaryManager from '../components/admin/GlossaryManager';
 import type { CosmeticItem } from '../components/Treasury';
 import { useAuth } from '../context/AuthContext';
 import { useTemplate } from '../context/TemplateContext';
 import { TEMPLATES, getTemplateDef } from '../theme/templates';
 
-type Tab = 'overview' | 'users' | 'sources' | 'sync' | 'gemini' | 'import' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system';
+type Tab = 'overview' | 'users' | 'sources' | 'sync' | 'chapters' | 'glossary' | 'gemini' | 'import' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: '📊 Tổng quan' },
   { id: 'users', label: '👥 Người dùng' },
   { id: 'sources', label: '🔗 Nguồn API' },
   { id: 'sync', label: '🔄 Đồng bộ' },
+  { id: 'chapters', label: '📝 Chương' },
+  { id: 'glossary', label: '📖 Từ điển' },
   { id: 'gemini', label: '🤖 Gemini' },
   { id: 'import', label: '✍️ Nhập truyện' },
   { id: 'thumbnails', label: '🖼️ Thumbnail' },
@@ -1153,7 +1157,8 @@ function SyncTab() {
       setSummary(
         `📥 "${row.title}": +${r.synced} chương mới` +
           (r.skipped.length ? ` · bỏ qua ${r.skipped.length} chương lỗi` : '') +
-          (r.stopped ? ' · đã dừng' : ''),
+          (r.stopped ? ' · đã dừng' : '') +
+          (r.note ? ` · ${r.note}` : ''),
       );
       await loadNovels(src.id);
     } catch (e) {
@@ -1324,7 +1329,8 @@ function SyncTab() {
         </p>
         <div className="mt-3 space-y-2">
           {novels.map((n) => {
-            const total = n.translated_count || 0;
+            // API có truyện báo translated_count=0 nhưng vẫn có nội dung → dùng max()
+            const total = Math.max(n.translated_count || 0, n.chapters_count || 0);
             const done = Math.min(n.synced_chapters, total);
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
             const running = busyNovel === n.id;
@@ -2022,6 +2028,8 @@ export default function Admin() {
         {tab === 'users' && <UsersTab />}
         {tab === 'sources' && <SourcesTab />}
         {tab === 'sync' && <SyncTab />}
+        {tab === 'chapters' && <ChapterManager />}
+        {tab === 'glossary' && <GlossaryManager />}
         {tab === 'gemini' && <GeminiTab />}
         {tab === 'import' && <ImportTab />}
         {tab === 'thumbnails' && <ThumbnailsTab />}
