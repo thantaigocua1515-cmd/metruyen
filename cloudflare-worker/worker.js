@@ -82,9 +82,22 @@ export default {
       });
     }
 
-    const buf = await aiRes.arrayBuffer();
-    return new Response(buf, {
-      headers: { 'Content-Type': 'image/png', ...CORS },
+    // Workers AI trả về JSON: { result: { image: "<base64>" } } — giải mã thành ảnh
+    let b64 = '';
+    try {
+      const data = await aiRes.json();
+      b64 = data?.result?.image ?? '';
+    } catch {
+      /* bỏ qua */
+    }
+    if (!b64) {
+      return new Response('Workers AI không trả về ảnh.', { status: 502, headers: CORS });
+    }
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Response(bytes, {
+      headers: { 'Content-Type': 'image/jpeg', ...CORS },
     });
   },
 };
