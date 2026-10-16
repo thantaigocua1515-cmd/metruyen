@@ -3,6 +3,7 @@ import {
   claimAchievement,
   claimQuest,
   ensureQuestRows,
+  ensureRankTitles,
   equipTitle,
   getAchievementsWithProgress,
   getMyTitles,
@@ -264,6 +265,7 @@ export function TitlePanel({ userId }: { userId: string }) {
   const [titles, setTitles] = useState<MyTitle[]>([]);
   const [loading, setLoading] = useState(true);
   const [equipping, setEquipping] = useState<string | null>(null);
+  const [healed, setHealed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -274,6 +276,25 @@ export function TitlePanel({ userId }: { userId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Tự phục hồi: nếu chưa có danh hiệu nào, thử trao bù rank 1 lần rồi tải lại
+  // (phòng trường hợp lần đầu load trước khi syncStateStats chạy xong)
+  useEffect(() => {
+    if (!loading && titles.length === 0 && !healed) {
+      setHealed(true);
+      (async () => {
+        await ensureRankTitles(userId);
+        setTitles(await getMyTitles(userId));
+      })();
+    }
+  }, [loading, titles.length, healed, userId]);
+
+  const retry = async () => {
+    setLoading(true);
+    await ensureRankTitles(userId);
+    setTitles(await getMyTitles(userId));
+    setLoading(false);
+  };
 
   const equip = async (t: MyTitle) => {
     if (t.equipped) return;
@@ -294,9 +315,14 @@ export function TitlePanel({ userId }: { userId: string }) {
   }
   if (titles.length === 0) {
     return (
-      <p className="py-8 text-center text-sm italic text-stone-500 dark:text-stone-400">
-        Chưa có danh hiệu nào. Hoàn thành thành tựu hoặc tăng cấp tu vi để nhận nhé!
-      </p>
+      <div className="py-8 text-center">
+        <p className="text-sm italic text-stone-500 dark:text-stone-400">
+          Chưa có danh hiệu nào. Hoàn thành thành tựu hoặc tăng cấp tu vi để nhận nhé!
+        </p>
+        <button onClick={() => void retry()} className={`${btnGhost} mt-3`}>
+          🔄 Kiểm tra lại danh hiệu
+        </button>
+      </div>
     );
   }
 

@@ -181,6 +181,12 @@ export async function bumpStat(
 
 /** Đồng bộ các chỉ số "trạng thái" từ DB hiện tại (gọi khi mở Profile, mua đồ, thêm tủ, đổi avatar). */
 export async function syncStateStats(userId: string): Promise<void> {
+  // trao bù danh hiệu rank CHẠY RIÊNG — không để lỗi ở các bước khác làm mất
+  try {
+    await ensureRankTitles(userId);
+  } catch {
+    /* bỏ qua */
+  }
   try {
     const sb = getSupabase();
     const { data: prof } = await sb
@@ -215,8 +221,6 @@ export async function syncStateStats(userId: string): Promise<void> {
       await bumpStat(userId, 'frames_owned', 0, 'set');
       await bumpStat(userId, 'treasures_owned', 0, 'set');
     }
-    // trao bù danh hiệu rank cho user cũ
-    await ensureRankTitles(userId);
   } catch {
     /* bỏ qua */
   }
@@ -247,31 +251,48 @@ export async function touchLogin(userId: string): Promise<void> {
 }
 
 /** Trao bù danh hiệu rank cho cấp hiện tại (user cũ đã tu luyện từ trước) —
- * lặng lẽ, không đổi danh hiệu đang đeo (trừ khi chưa đeo cái nào). */
-export async function ensureRankTitles(userId: string): Promise<void> {
+ * lặng lẽ, không đổi danh hiệu đang đeo (trừ khi chưa đeo cái nào).
+ * Trả về số danh hiệu đã trao (để debug). */
+export async function ensureRankTitles(userId: string): Promise<number> {
   try {
     const sb = getSupabase();
-    const { data: prof } = await sb
+    const { data: prof, error: pErr } = await sb
       .from('profiles')
       .select('reading_seconds')
       .eq('id', userId)
       .single();
-    if (!prof) return;
+    if (pErr) {
+      console.warn('[gamification] ensureRankTitles: profiles error', pErr.message);
+      return 0;
+    }
+    if (!prof) return 0;
     const idx = getRank((prof as { reading_seconds: number }).reading_seconds / 3600).index;
-    const { data: titles } = await sb
+    const { data: titles, error: tErr } = await sb
       .from('titles')
       .select('id, code')
       .like('code', 'rank_%')
       .eq('is_active', true);
+    if (tErr) {
+      console.warn('[gamification] ensureRankTitles: titles error', tErr.message);
+      return 0;
+    }
     const list = (titles ?? []) as { id: string; code: string }[];
+    if (list.length === 0) {
+      console.warn('[gamification] ensureRankTitles: bảng titles trống!');
+      return 0;
+    }
     const wanted = new Set(Array.from({ length: idx + 1 }, (_, i) => `rank_${i}`));
     const rows = list
       .filter((t) => wanted.has(t.code))
       .map((t) => ({ user_id: userId, title_id: t.id }));
-    if (rows.length === 0) return;
-    await sb
+    if (rows.length === 0) return 0;
+    const { error: uErr } = await sb
       .from('user_titles')
       .upsert(rows, { onConflict: 'user_id,title_id', ignoreDuplicates: true });
+    if (uErr) {
+      console.warn('[gamification] ensureRankTitles: upsert error', uErr.message);
+      return 0;
+    }
     // nếu chưa đeo danh hiệu nào thì đeo luôn cái cao nhất
     const { count } = await sb
       .from('user_titles')
@@ -288,8 +309,11 @@ export async function ensureRankTitles(userId: string): Promise<void> {
           .eq('title_id', top.id);
       }
     }
-  } catch {
-    /* bỏ qua */
+    console.info(`[gamification] ensureRankTitles: đã trao ${rows.length} danh hiệu rank cho ${userId}`);
+    return rows.length;
+  } catch (e) {
+    console.warn('[gamification] ensureRankTitles: exception', e);
+    return 0;
   }
 }
 
