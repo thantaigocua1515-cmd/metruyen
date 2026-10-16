@@ -1,9 +1,8 @@
 import { getSupabase } from '../lib/supabase';
 
 /**
- * Tạo thumbnail truyện bằng canvas: nền gradient tu tiên + họa tiết,
- * TÊN TRUYỆN cỡ lớn nổi bật, tên tác giả nhỏ hơn bên dưới.
- * Xuất PNG rồi upload lên Storage bucket `covers`.
+ * Ghép ảnh nền AI (Gemini) + chữ tên truyện/tác giả + khung vàng → PNG 768x1152,
+ * upload lên Storage bucket `covers`.
  */
 
 const W = 768;
@@ -24,53 +23,6 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
   }
   if (line) lines.push(line);
   return lines;
-}
-
-function drawBackground(ctx: CanvasRenderingContext2D) {
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, '#171031');
-  g.addColorStop(0.45, '#2c1a52');
-  g.addColorStop(1, '#0d0918');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, H);
-
-  // quầng sáng vàng trên, tím dưới
-  const glowTop = ctx.createRadialGradient(W / 2, H * 0.18, 40, W / 2, H * 0.18, W * 0.75);
-  glowTop.addColorStop(0, 'rgba(246, 211, 105, 0.28)');
-  glowTop.addColorStop(1, 'rgba(246, 211, 105, 0)');
-  ctx.fillStyle = glowTop;
-  ctx.fillRect(0, 0, W, H);
-
-  const glowBottom = ctx.createRadialGradient(W / 2, H * 0.85, 40, W / 2, H * 0.85, W * 0.7);
-  glowBottom.addColorStop(0, 'rgba(147, 112, 219, 0.22)');
-  glowBottom.addColorStop(1, 'rgba(147, 112, 219, 0)');
-  ctx.fillStyle = glowBottom;
-  ctx.fillRect(0, 0, W, H);
-
-  // họa tiết chấm sao
-  ctx.fillStyle = 'rgba(255, 235, 180, 0.5)';
-  let seed = 42;
-  const rand = () => {
-    seed = (seed * 1103515245 + 12345) % 2147483648;
-    return seed / 2147483648;
-  };
-  for (let i = 0; i < 90; i++) {
-    const x = rand() * W;
-    const y = rand() * H;
-    const r = 1 + rand() * 2.2;
-    ctx.globalAlpha = 0.15 + rand() * 0.4;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  // khung viền vàng đôi
-  ctx.strokeStyle = '#d4af37';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(28, 28, W - 56, H - 56);
-  ctx.lineWidth = 3;
-  ctx.strokeRect(52, 52, W - 104, H - 104);
 }
 
 function drawOrnament(ctx: CanvasRenderingContext2D, y: number) {
@@ -146,38 +98,6 @@ export function drawTitleBlock(
   ctx.fillText('· MÊ TRUYỆN ·', W / 2, H - 120);
 }
 
-/** Vẽ bìa, trả về Blob PNG. */
-export async function generateCover(title: string, author?: string | null): Promise<Blob> {
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Trình duyệt không hỗ trợ canvas.');
-
-  drawBackground(ctx);
-  drawTitleBlock(ctx, title, author, 0.4);
-
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-  if (!blob) throw new Error('Xuất ảnh thất bại.');
-  return blob;
-}
-
-function buildAIPrompt(title: string): string {
-  // Prompt tiếng Anh cho model hiểu tốt; KHÔNG yêu cầu vẽ chữ (AI vẽ chữ kém,
-  // nhất là tiếng Việt) — chữ sẽ do canvas vẽ đè lên.
-  const clean = title
-    .replace(/[^\p{L}\p{N}\s:·—–-]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 80);
-  return (
-    `Epic chinese xianxia fantasy novel cover illustration inspired by "${clean}": ` +
-    `majestic misty mountains, a lone swordsman flying on a sword among glowing clouds, ` +
-    `swirling spiritual energy, dramatic cinematic lighting, vibrant colors, ` +
-    `highly detailed digital painting, no text, no watermark, no signature`
-  );
-}
-
 /** Đọc Blob ảnh thành HTMLImageElement. */
 export function loadImage(blob: Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -238,19 +158,6 @@ export async function composeAICover(
   const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
   if (!out) throw new Error('Xuất ảnh thất bại.');
   return out;
-}
-
-export async function generateAICover(title: string, author?: string | null): Promise<Blob> {
-  const seed = Math.floor(Math.random() * 1_000_000_000);
-  const url =
-    `https://image.pollinations.ai/prompt/${encodeURIComponent(buildAIPrompt(title))}` +
-    `?width=${W}&height=${H}&nologo=true&seed=${seed}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`AI image HTTP ${res.status}`);
-  const blob = await res.blob();
-  if (!blob.type.startsWith('image/')) throw new Error('AI không trả về ảnh.');
-  const img = await loadImage(blob);
-  return composeAICover(img, title, author);
 }
 
 /** Upload blob lên bucket `covers`, trả về public URL. */

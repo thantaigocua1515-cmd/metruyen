@@ -7,7 +7,7 @@ import { syncNovelList, syncChapters, checkUpdates } from '../lib/sync';
 import { getSyncedNovels } from '../lib/library';
 import type { SyncedNovelRow } from '../lib/library';
 import { testGeminiKey, translateText, generateGeminiCover, getActiveKeys } from '../lib/translate';
-import { generateCover, generateAICover, uploadCover } from '../components/CoverGenerator';
+import { uploadCover } from '../components/CoverGenerator';
 import ChapterManager from '../components/admin/ChapterManager';
 import GlossaryManager from '../components/admin/GlossaryManager';
 import type { CosmeticItem } from '../components/Treasury';
@@ -375,7 +375,6 @@ function NovelThumbRow({
 }) {
   const [url, setUrl] = useState(current ?? '');
   const [busy, setBusy] = useState(false);
-  const [aiSource, setAiSource] = useState<'pollinations' | 'gemini'>('pollinations');
 
   useEffect(() => {
     setUrl(current ?? '');
@@ -424,36 +423,18 @@ function NovelThumbRow({
 
   const genAI = async () => {
     if (busy) return;
+    const keys = await getActiveKeys();
+    if (keys.length === 0) {
+      alert('Chưa có Gemini API key nào đang bật. Vào tab 🤖 Gemini để thêm key trước nhé.');
+      return;
+    }
     setBusy(true);
     try {
-      if (aiSource === 'gemini') {
-        const keys = await getActiveKeys();
-        if (keys.length === 0) {
-          alert('Chưa có Gemini API key nào đang bật. Vào tab 🤖 Gemini để thêm key trước nhé.');
-          return;
-        }
-      }
-      // Nguồn chính → nguồn còn lại → bản vẽ canvas
-      let blob: Blob;
-      let usedCanvasFallback = false;
-      const primary = aiSource === 'gemini' ? generateGeminiCover : generateAICover;
-      const secondary = aiSource === 'gemini' ? generateAICover : generateGeminiCover;
-      try {
-        blob = await primary(novel.title, novel.author);
-      } catch {
-        try {
-          blob = await secondary(novel.title, novel.author);
-        } catch {
-          usedCanvasFallback = true;
-          blob = await generateCover(novel.title, novel.author);
-        }
-      }
+      // Chỉ dùng Gemini — prompt ảnh dựa trên tên truyện + tóm tắt mô tả
+      const blob = await generateGeminiCover(novel.title, novel.author, novel.description);
       const publicUrl = await uploadCover(blob, novel.sourceId, novel.id);
       setUrl(publicUrl);
       await save(publicUrl);
-      if (usedCanvasFallback) {
-        alert('Cả hai nguồn AI đều bận/lỗi nên đã tạo bìa bằng bản vẽ canvas. Thử lại sau nhé.');
-      }
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Tạo thumbnail thất bại.');
     } finally {
@@ -480,16 +461,6 @@ function NovelThumbRow({
           <button onClick={() => void saveUrl()} disabled={busy} className={btnPrimary}>
             Lưu URL
           </button>
-          <select
-            value={aiSource}
-            onChange={(e) => setAiSource(e.target.value as 'pollinations' | 'gemini')}
-            disabled={busy}
-            className={btnGhost}
-            title="Chọn nguồn AI tạo ảnh"
-          >
-            <option value="pollinations">Pollinations (miễn phí)</option>
-            <option value="gemini">Gemini (cần key)</option>
-          </select>
           <button onClick={() => void genAI()} disabled={busy} className={btnGhost}>
             {busy ? '...' : '✨ Tạo bằng AI'}
           </button>

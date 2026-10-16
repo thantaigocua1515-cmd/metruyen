@@ -213,18 +213,25 @@ export async function translateText(
 const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image'; // model tạo ảnh hiện tại (Nano Banana 2)
 const IMAGE_REQUEST_TIMEOUT_MS = 120000;
 
-function buildCoverImagePrompt(title: string): string {
+function buildCoverImagePrompt(title: string, description?: string | null): string {
   const clean = title
     .replace(/[^\p{L}\p{N}\s:·—–-]/gu, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 80);
+  // Tóm tắt mô tả giúp AI vẽ đúng bối cảnh/nhân vật của truyện — cắt ngắn để prompt gọn
+  const synopsis = (description ?? '').replace(/\s+/g, ' ').trim().slice(0, 600);
+  const synopsisPart = synopsis
+    ? `Story synopsis (use it to choose the scene, characters, creatures, setting and mood — do NOT copy it literally): """${synopsis}"""\n`
+    : '';
   return (
-    `Epic chinese xianxia fantasy novel cover illustration inspired by "${clean}": ` +
-    `majestic misty mountains, a lone swordsman flying on a sword among glowing clouds, ` +
-    `swirling spiritual energy, dramatic cinematic lighting, vibrant colors, ` +
-    `highly detailed digital painting, vertical portrait composition, ` +
-    `IMPORTANT: absolutely no text, no letters, no words, no watermark, no signature anywhere in the image`
+    `Epic chinese xianxia fantasy novel cover illustration for the novel "${clean}".\n` +
+    synopsisPart +
+    `Visual direction: compose ONE cinematic key scene from the story — the protagonist and the most iconic ` +
+    `elements (e.g. flying swords, divine beasts, ancient sects, spirit flames, celestial palaces, ` +
+    `misty mountains). Majestic atmosphere, dramatic cinematic lighting, rich vibrant colors, ` +
+    `highly detailed digital painting, vertical portrait composition.\n` +
+    `IMPORTANT: absolutely no text, no letters, no words, no watermark, no signature anywhere in the image.`
   );
 }
 
@@ -286,12 +293,13 @@ async function generateGeminiImage(key: string, prompt: string): Promise<Blob> {
 export async function generateGeminiCover(
   title: string,
   author?: string | null,
+  description?: string | null,
 ): Promise<Blob> {
   const keys = await getActiveKeys();
   if (keys.length === 0) {
     throw new Error('Chưa có Gemini API key nào đang bật. Vào Admin → 🤖 Gemini để thêm key.');
   }
-  const prompt = buildCoverImagePrompt(title);
+  const prompt = buildCoverImagePrompt(title, description);
   let lastErr: unknown = null;
   for (const k of keys) {
     try {
