@@ -8,135 +8,95 @@ import { getSupabase } from '../lib/supabase';
 const W = 768;
 const H = 1152;
 
-function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let line = '';
-  for (const w of words) {
-    const test = line ? `${line} ${w}` : w;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line);
-      line = w;
-    } else {
-      line = test;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
-function drawOrnament(ctx: CanvasRenderingContext2D, y: number) {
-  // đường gạch mảnh 2 bên + hình thoi nhỏ ở giữa, mờ nhẹ cho thanh lịch
-  ctx.save();
-  ctx.globalAlpha = 0.7;
-  ctx.strokeStyle = '#e8c96a';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(W / 2 - 110, y);
-  ctx.lineTo(W / 2 - 26, y);
-  ctx.moveTo(W / 2 + 26, y);
-  ctx.lineTo(W / 2 + 110, y);
-  ctx.stroke();
-  ctx.translate(W / 2, y);
-  ctx.rotate(Math.PI / 4);
-  ctx.fillStyle = '#e8c96a';
-  ctx.fillRect(-8, -8, 16, 16);
-  ctx.restore();
-}
-
-/** Đảm bảo font Cormorant Garamond đã load trước khi vẽ (không thì chữ xấu). */
+/** Đảm bảo font chữ đã load trước khi vẽ (không thì chữ xấu). */
 async function ensureFonts(): Promise<void> {
   try {
     await Promise.all([
-      document.fonts.load('700 100px "Cormorant Garamond"'),
-      document.fonts.load('600 40px "Cormorant Garamond"'),
+      document.fonts.load('700 100px "Dancing Script"'),
+      document.fonts.load('500 46px "Dancing Script"'),
+      document.fonts.load('600 30px "Cormorant Garamond"'),
     ]);
   } catch {
     /* bỏ qua — dùng font dự phòng */
   }
 }
 
-const TITLE_FONT = (size: number) =>
-  `700 ${size}px "Cormorant Garamond", Georgia, "Times New Roman", serif`;
-const AUTHOR_FONT = (size: number) =>
-  `600 ${size}px "Cormorant Garamond", Georgia, serif`;
+/** Font thư pháp cho tên truyện (kiểu bìa truyện tu tiên). */
+const SCRIPT_FONT = (size: number, weight = 700) =>
+  `${weight} ${size}px "Dancing Script", "Cormorant Garamond", cursive`;
 
-/** Vẽ khối tên truyện (phong cách tu tiên/điện ảnh) + tên tác giả + chữ ký. */
+/**
+ * Vẽ tên truyện kiểu thư pháp: trắng, mỗi từ một dòng xếp dọc,
+ * như bìa truyện tu tiên truyền thống. Tên tác giả nhỏ bên dưới.
+ */
 export function drawTitleBlock(
   ctx: CanvasRenderingContext2D,
   title: string,
   author: string | null | undefined,
-  centerRatio = 0.4,
+  centerRatio = 0.58,
 ) {
-  const maxWidth = W - 140;
+  const maxWidth = W - 120;
+  const maxBlockH = H * 0.52;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  // giãn chữ nhẹ cho chất điện ảnh (trình duyệt không hỗ trợ thì bỏ qua)
-  try {
-    (ctx as unknown as { letterSpacing: string }).letterSpacing = '3px';
-  } catch {
-    /* bỏ qua */
+
+  // Xếp từ: tên ngắn thì mỗi từ một dòng, tên dài thì 2 từ một dòng
+  const words = title.trim().split(/\s+/).filter(Boolean);
+  const perLine = words.length <= 5 ? 1 : 2;
+  const lines: string[] = [];
+  for (let i = 0; i < words.length; i += perLine) {
+    lines.push(words.slice(i, i + perLine).join(' '));
   }
 
-  // Tên truyện — Cormorant Garamond đậm, cỡ lớn
-  let titleSize = 92;
-  ctx.font = TITLE_FONT(titleSize);
-  let lines = wrapLines(ctx, title.trim(), maxWidth);
-  while (lines.length > 5 && titleSize > 52) {
-    titleSize -= 6;
-    ctx.font = TITLE_FONT(titleSize);
-    lines = wrapLines(ctx, title.trim(), maxWidth);
+  // Co cỡ chữ đến khi vừa khung
+  let size = 124;
+  while (size > 54) {
+    ctx.font = SCRIPT_FONT(size);
+    const widest = lines.length ? Math.max(...lines.map((l) => ctx.measureText(l).width)) : 0;
+    const totalH = lines.length * size * 1.04;
+    if (widest <= maxWidth && totalH <= maxBlockH) break;
+    size -= 8;
   }
-  const titleBlockH = lines.length * titleSize * 1.22;
-  const titleY = H * centerRatio - titleBlockH / 2;
+  ctx.font = SCRIPT_FONT(size);
 
-  // gradient vàng kim tinh tế: sáng trên, trầm dưới
-  const gold = ctx.createLinearGradient(0, titleY, 0, titleY + titleBlockH);
-  gold.addColorStop(0, '#fff6d8');
-  gold.addColorStop(0.45, '#f3cd6b');
-  gold.addColorStop(1, '#b97f1f');
-  ctx.fillStyle = gold;
-  // bóng đổ điện ảnh: sâu + viền sáng nhẹ quanh chữ
-  ctx.shadowColor = 'rgba(0,0,0,0.85)';
-  ctx.shadowBlur = 26;
-  ctx.shadowOffsetY = 7;
+  const lineH = size * 1.04;
+  const blockH = lines.length * lineH;
+  const startY = H * centerRatio - blockH / 2;
+
+  // Chữ thư pháp trắng, bóng đổ mềm để nổi trên nền ảnh
+  ctx.fillStyle = '#fffef9';
+  ctx.shadowColor = 'rgba(0,0,0,0.78)';
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 6;
   lines.forEach((ln, i) => {
-    ctx.fillText(ln, W / 2, titleY + titleSize * 0.61 + i * titleSize * 1.22);
+    ctx.fillText(ln, W / 2, startY + lineH * (i + 0.5));
   });
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
 
-  // Tên tác giả — nhỏ, thanh lịch
-  const authorY = titleY + titleBlockH + 78;
-  drawOrnament(ctx, authorY - 56);
+  // Tên tác giả — chữ script nhỏ, mờ nhẹ bên dưới
   if (author && author.trim()) {
-    ctx.font = AUTHOR_FONT(40);
-    ctx.fillStyle = '#f2e8d5';
+    let aSize = 48;
+    const aName = author.trim();
+    while (aSize > 28) {
+      ctx.font = SCRIPT_FONT(aSize, 500);
+      if (ctx.measureText(aName).width <= maxWidth) break;
+      aSize -= 4;
+    }
+    ctx.font = SCRIPT_FONT(aSize, 500);
+    ctx.fillStyle = 'rgba(255,254,249,0.9)';
     ctx.shadowColor = 'rgba(0,0,0,0.7)';
-    ctx.shadowBlur = 12;
-    ctx.shadowOffsetY = 3;
-    const authorLines = wrapLines(ctx, author.trim(), maxWidth);
-    authorLines.slice(0, 2).forEach((ln, i) => {
-      ctx.fillText(ln, W / 2, authorY + i * 54);
-    });
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+    ctx.fillText(aName, W / 2, startY + blockH + 62);
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
   }
 
-  // chữ nhỏ dưới cùng
-  try {
-    (ctx as unknown as { letterSpacing: string }).letterSpacing = '6px';
-  } catch {
-    /* bỏ qua */
-  }
-  ctx.font = AUTHOR_FONT(30);
-  ctx.fillStyle = 'rgba(240, 230, 210, 0.5)';
-  ctx.fillText('MÊ TRUYỆN', W / 2, H - 110);
-  try {
-    (ctx as unknown as { letterSpacing: string }).letterSpacing = '0px';
-  } catch {
-    /* bỏ qua */
-  }
+  // chữ ký nhỏ dưới cùng
+  ctx.font = '600 28px "Cormorant Garamond", Georgia, serif';
+  ctx.fillStyle = 'rgba(240, 230, 210, 0.45)';
+  ctx.fillText('· MÊ TRUYỆN ·', W / 2, H - 96);
 }
 
 /** Đọc Blob ảnh thành HTMLImageElement. */
