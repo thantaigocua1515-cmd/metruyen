@@ -489,3 +489,51 @@ grant all on public.sync_jobs to authenticated;
 
 -- realtime để admin xem tiến trình live
 alter publication supabase_realtime add table public.sync_jobs;
+
+-- 23. translation_styles: phong cách dịch Gemini do admin quản lý -----------------
+create table if not exists public.translation_styles (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  prompt text not null,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now()
+);
+alter table public.translation_styles enable row level security;
+drop policy if exists translation_styles_public_read on public.translation_styles;
+create policy translation_styles_public_read on public.translation_styles
+  for select using (true);
+drop policy if exists translation_styles_admin_write on public.translation_styles;
+create policy translation_styles_admin_write on public.translation_styles
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+grant select on public.translation_styles to anon;
+grant all on public.translation_styles to authenticated;
+-- Seed 4 phong cách (idempotent)
+insert into public.translation_styles (name, prompt, is_default) values
+  ('Tu tiên cổ điển', 'Dịch sang tiếng Việt văn phong tu tiên cổ điển, dùng nhiều từ Hán Việt trang trọng, giữ nguyên tên riêng và thuật ngữ tu chân, không thêm bớt hay bình luận, chỉ trả về bản dịch.', true),
+  ('Hiện đại mượt mà', 'Dịch sang tiếng Việt hiện đại, câu văn mượt mà dễ đọc, hạn chế Hán Việt khó hiểu, giữ tên riêng, chỉ trả về bản dịch.', false),
+  ('Hài hước dí dỏm', 'Dịch sang tiếng Việt giữ nguyên chất hài hước dí dỏm của bản gốc, văn phong trẻ trung tự nhiên, chỉ trả về bản dịch.', false),
+  ('Kiếm hiệp hào hùng', 'Dịch sang tiếng Việt văn phong kiếm hiệp hào hùng, câu văn mạnh mẽ, giữ tên riêng và tên chiêu thức, chỉ trả về bản dịch.', false)
+on conflict (name) do nothing;
+
+-- 24. translation_glossary: từ điển dịch tự học (không cần Gemini) ---------------
+-- novel_id = '' nghĩa là từ toàn cục (áp dụng mọi truyện).
+create table if not exists public.translation_glossary (
+  id uuid primary key default gen_random_uuid(),
+  novel_id text not null default '',
+  source_term text not null,
+  target_term text not null,
+  usage_count int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (novel_id, source_term)
+);
+alter table public.translation_glossary enable row level security;
+drop policy if exists translation_glossary_admin_all on public.translation_glossary;
+create policy translation_glossary_admin_all on public.translation_glossary
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+grant all on public.translation_glossary to authenticated;
+-- KHÔNG có policy public: chỉ admin đọc/ghi (giống gemini_keys).

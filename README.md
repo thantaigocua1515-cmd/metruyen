@@ -247,3 +247,36 @@ alter publication supabase_realtime add table public.sync_jobs;
   bạn, tác phẩm miễn phí/không bản quyền). Không có chức năng cào web tự động.
 - Truyện manual đọc được ngay trên web (Home/Detail/Reader đều đọc DB-first);
   `checkUpdates` bỏ qua nguồn manual.
+
+## 9. Sửa chương, phong cách dịch & Từ điển tự học 📝📖
+
+**Tổng số chương thực tế:** một số truyện API báo `translated_count=0` nhưng
+endpoint chương vẫn trả nội dung đầy đủ. Sync (cả tab Đồng bộ foreground lẫn
+Edge Function `sync-worker`) luôn dùng `max(translated_count, chapters_count)`
+làm tổng — không bao giờ hiện/sync "0/0" khi truyện còn chương. Van an toàn:
+dừng sau **50 lỗi liên tiếp** (ghi chú vào job/novel, coi như đã hết chương).
+
+**Tab 📝 Chương — sửa từng chương:**
+- Dropdown chọn truyện (gồm cả truyện nhập tay) → mục lục phân trang 50/trang
+  + ô "nhảy tới chương số" → bấm chương để mở editor (tiêu đề + nội dung lớn).
+- Dropdown engine: **🤖 Gemini** (hiện thêm dropdown phong cách dịch, nút
+  "Dịch" đổ kết quả vào ô nội dung để sửa trước khi lưu) hoặc **📖 Từ điển**
+  (áp dụng từ điển tự học, báo số từ/lượt thay thế + tăng usage_count).
+- Nút **💾 Lưu chương** (upsert + cập nhật số chương). Helper **➕ Lưu từ vào
+  từ điển**: nhập từ gốc + nghĩa, chọn phạm vi toàn cục/truyện này.
+
+**Tab 📖 Từ điển — quản lý từ điển + phong cách:**
+- **Từ điển:** form thêm (từ gốc, nghĩa, phạm vi), ô tìm kiếm, danh sách sắp
+  theo lượt dùng giảm dần (hiện số lượt), sửa/xóa. Từ điển chỉ thay thế chuỗi
+  trực tiếp (khớp dài nhất trước) — bản nháp, nên biên tập lại hoặc chạy tiếp
+  Gemini cho mượt.
+- **Phong cách dịch:** danh sách, thêm/sửa/xóa, đặt mặc định (luôn chỉ 1
+  mặc định). Seed sẵn 4 phong cách: Tu tiên cổ điển (mặc định), Hiện đại mượt
+  mà, Hài hước dí dỏm, Kiếm hiệp hào hùng.
+
+**Schema mới:** `translation_styles` (public SELECT, admin ALL) và
+`translation_glossary` (chỉ admin, `novel_id=''` = toàn cục). Chạy migration
+SQL 1 lần trên Supabase live (xem mục 1).
+
+**Lưu ý:** chỉ nhập/dịch nội dung bạn có quyền sử dụng. Không có chức năng cào
+web tự động.

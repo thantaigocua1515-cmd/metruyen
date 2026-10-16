@@ -193,7 +193,15 @@ interface ChunkState {
   job: SyncJob;
 }
 
-/** Trả về 'ok' | 'chained' (hết giờ, đã tự gọi tiếp) | 'cancelled' */
+// Van an toàn: dừng sau N lỗi LIÊN TIẾP (coi như đã hết chương / API lỗi hẳn).
+const MAX_CONSECUTIVE_ERRORS = 50;
+
+interface RangeOutcome {
+  res: 'ok' | 'chained' | 'cancelled';
+  note?: string;
+}
+
+/** Trả về { res, note? } */
 async function syncChapterRange(
   sb: SupaAdmin,
   base: string,
@@ -202,11 +210,12 @@ async function syncChapterRange(
   from: number,
   to: number,
   st: ChunkState,
-): Promise<'ok' | 'chained' | 'cancelled'> {
+): Promise<RangeOutcome> {
   const have = await getHaveChapters(sb, key);
   const targets: number[] = [];
   for (let n = from; n <= to; n++) if (!have.has(n)) targets.push(n);
 
+  let consecutiveErrors = 0;
   for (let i = 0; i < targets.length; i++) {
     const n = targets[i];
     // Hết ngân sách thời gian → lưu tiến trình, tự gọi tiếp chunk sau
@@ -218,7 +227,7 @@ async function syncChapterRange(
         heartbeat_at: nowIso(),
       });
       await doSelfChain(st.job.id);
-      return 'chained';
+      return { res: 'chained' };
     }
     try {
       const { title, content } = await apiChapterFull(base, apiId, n);
@@ -227,8 +236,16 @@ async function syncChapterRange(
         { onConflict: 'novel_id,chapter_number' },
       );
       if (error) throw error;
+      consecutiveErrors = 0;
     } catch {
       st.prog.skipped++;
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        return {
+          res: 'ok',
+          note: `Dừng sau ${MAX_CONSECUTIVE_ERRORS} lỗi liên tiếp (tới chương ${n}) — có thể đã hết chương đọc được hoặc API lỗi.`,
+        };
+      }
     }
     st.prog.done++;
     // Cập nhật tiến trình + kiểm tra hủy mỗi PROGRESS_EVERY chương
@@ -240,11 +257,11 @@ async function syncChapterRange(
         heartbeat_at: nowIso(),
       });
       const cur = await getJob(sb, st.job.id);
-      if (cur?.status === 'cancelled') return 'cancelled';
+      if (cur?.status === 'cancelled') return { res: 'cancelled' };
     }
     await sleep(POLITENESS_MS);
   }
-  return 'ok';
+  return { res: 'ok' };
 }
 
 /* ---------------- Các loại job ---------------- */
@@ -283,24 +300,26 @@ async function runSyncNovel(
   source: ApiSource,
   base: string,
   st: ChunkState,
-): Promise<'ok' | 'chained' | 'cancelled'> {
+): Promise<RangeOutcome> {
   const key = job.novel_key;
   if (!key) throw new Error('Job thiếu novel_key.');
   const { data: row } = await sb
     .from('synced_novels')
-    .select('api_id,translated_count')
+    .select('api_id,translated_count,chapters_count')
     .eq('id', key)
     .single();
   if (!row) throw new Error('Truyện chưa có trong database — hãy đồng bộ danh sách trước.');
   const apiId = (row as { api_id: string }).api_id;
-  let translated = (row as { translated_count: number }).translated_count ?? 0;
+  // API có truyện báo translated_count=0 nhưng vẫn có nội dung → dùng max()
+  const rc = row as { translated_count: number; chapters_count: number };
+  let translated = Math.max(rc.translated_count ?? 0, rc.chapters_count ?? 0);
   try {
     const d = await apiNovelDetail(base, apiId);
-    translated = d.translatedCount || translated;
+    translated = Math.max(d.translatedCount, d.chaptersCount, translated);
     await sb
       .from('synced_novels')
       .update({
-        translated_count: translated,
+        translated_count: d.translatedCount,
         chapters_count: d.chaptersCount,
         title: d.title,
         last_synced_at: nowIso(),
@@ -311,7 +330,7 @@ async function runSyncNovel(
   }
   st.prog.total = translated;
   const r = await syncChapterRange(sb, base, key, apiId, 1, translated, st);
-  if (r === 'ok') await refreshNovelCounts(sb, key);
+  if (r.res === 'ok') await refreshNovelCounts(sb, key);
   return r;
 }
 
@@ -322,7 +341,7 @@ async function runSyncAll(
   source: ApiSource,
   base: string,
   st: ChunkState,
-): Promise<'ok' | 'chained' | 'cancelled'> {
+): Promise<RangeOutcome> {
   // Pha 1: metadata
   const list = await apiNovelList(base);
   for (const meta of list) {
@@ -339,24 +358,32 @@ async function runSyncAll(
   }
   await updateJob(sb, job.id, { heartbeat_at: nowIso() });
 
-  // Pha 2: chương từng truyện — tính total = tổng translated_count
+  // Pha 2: chương từng truyện — tính total = tổng max(translated_count, chapters_count)
   const { data: novels } = await sb
     .from('synced_novels')
-    .select('id,api_id,translated_count')
+    .select('id,api_id,translated_count,chapters_count')
     .eq('source_id', source.id)
     .order('created_at');
-  const rows = (novels ?? []) as { id: string; api_id: string; translated_count: number }[];
-  st.prog.total = rows.reduce((s, r) => s + (r.translated_count ?? 0), 0);
+  const rows = (novels ?? []) as {
+    id: string;
+    api_id: string;
+    translated_count: number;
+    chapters_count: number;
+  }[];
+  st.prog.total = rows.reduce(
+    (s, r) => s + Math.max(r.translated_count ?? 0, r.chapters_count ?? 0),
+    0,
+  );
 
   for (const r of rows) {
-    let translated = r.translated_count ?? 0;
+    let translated = Math.max(r.translated_count ?? 0, r.chapters_count ?? 0);
     try {
       const d = await apiNovelDetail(base, r.api_id);
-      translated = d.translatedCount || translated;
+      translated = Math.max(d.translatedCount, d.chaptersCount, translated);
       await sb
         .from('synced_novels')
         .update({
-          translated_count: translated,
+          translated_count: d.translatedCount,
           chapters_count: d.chaptersCount,
           title: d.title,
           last_synced_at: nowIso(),
@@ -366,18 +393,19 @@ async function runSyncAll(
       /* dùng số cũ */
     }
     // Điều chỉnh total nếu số chương mới khác ước tính ban đầu
-    const delta = translated - (r.translated_count ?? 0);
+    const prevEst = Math.max(r.translated_count ?? 0, r.chapters_count ?? 0);
+    const delta = translated - prevEst;
     if (delta !== 0) {
       st.prog.total += delta;
       await updateJob(sb, job.id, { total: st.prog.total, heartbeat_at: nowIso() });
     }
     const res = await syncChapterRange(sb, base, r.id, r.api_id, 1, translated, st);
     await refreshNovelCounts(sb, r.id);
-    if (res !== 'ok') return res; // 'chained' hoặc 'cancelled'
+    if (res.res !== 'ok') return res; // 'chained' hoặc 'cancelled'
     const cur = await getJob(sb, job.id);
-    if (cur?.status === 'cancelled') return 'cancelled';
+    if (cur?.status === 'cancelled') return { res: 'cancelled' };
   }
-  return 'ok';
+  return { res: 'ok' };
 }
 
 /** kind = 'check-updates': chỉ thêm truyện mới / chương mới. */
@@ -387,49 +415,57 @@ async function runCheckUpdates(
   source: ApiSource,
   base: string,
   st: ChunkState,
-): Promise<'ok' | 'chained' | 'cancelled'> {
+): Promise<RangeOutcome> {
   const list = await apiNovelList(base);
   st.prog.total = list.length;
   const { data: rows } = await sb
     .from('synced_novels')
-    .select('id,api_id,translated_count')
+    .select('id,api_id,translated_count,chapters_count')
     .eq('source_id', source.id);
   const byApiId = new Map(
-    ((rows ?? []) as { id: string; api_id: string; translated_count: number }[]).map((r) => [
-      r.api_id,
-      r,
-    ]),
+    (
+      (rows ?? []) as {
+        id: string;
+        api_id: string;
+        translated_count: number;
+        chapters_count: number;
+      }[]
+    ).map((r) => [r.api_id, r]),
   );
   for (const meta of list) {
     if (Date.now() - st.t0 > TIME_BUDGET_MS) {
       await doSelfChain(job.id);
-      return 'chained';
+      return { res: 'chained' };
     }
     const cur = byApiId.get(meta.apiId);
     try {
       const d = await apiNovelDetail(base, meta.apiId);
       const key = `${source.id}:${meta.apiId}`;
+      const apiTotal = Math.max(d.translatedCount, d.chaptersCount);
       if (!cur) {
         await upsertNovelMeta(sb, source.id, d);
         // Truyện mới: sync luôn chương để đọc được ngay
-        st.prog.total += d.translatedCount;
-        const res = await syncChapterRange(sb, base, key, meta.apiId, 1, d.translatedCount, st);
+        st.prog.total += apiTotal;
+        const res = await syncChapterRange(sb, base, key, meta.apiId, 1, apiTotal, st);
         await refreshNovelCounts(sb, key);
-        if (res !== 'ok') return res;
-      } else if (d.translatedCount > cur.translated_count) {
-        const from = cur.translated_count + 1;
-        st.prog.total += d.translatedCount - cur.translated_count;
-        const res = await syncChapterRange(sb, base, cur.id, meta.apiId, from, d.translatedCount, st);
-        await sb
-          .from('synced_novels')
-          .update({
-            translated_count: d.translatedCount,
-            chapters_count: d.chaptersCount,
-            last_synced_at: nowIso(),
-          })
-          .eq('id', cur.id);
-        await refreshNovelCounts(sb, cur.id);
-        if (res !== 'ok') return res;
+        if (res.res !== 'ok') return res;
+      } else {
+        const curTotal = Math.max(cur.translated_count ?? 0, cur.chapters_count ?? 0);
+        if (apiTotal > curTotal) {
+          const from = curTotal + 1;
+          st.prog.total += apiTotal - curTotal;
+          const res = await syncChapterRange(sb, base, cur.id, meta.apiId, from, apiTotal, st);
+          await sb
+            .from('synced_novels')
+            .update({
+              translated_count: d.translatedCount,
+              chapters_count: d.chaptersCount,
+              last_synced_at: nowIso(),
+            })
+            .eq('id', cur.id);
+          await refreshNovelCounts(sb, cur.id);
+          if (res.res !== 'ok') return res;
+        }
       }
     } catch {
       st.prog.skipped++;
@@ -443,11 +479,11 @@ async function runCheckUpdates(
         heartbeat_at: nowIso(),
       });
       const c = await getJob(sb, job.id);
-      if (c?.status === 'cancelled') return 'cancelled';
+      if (c?.status === 'cancelled') return { res: 'cancelled' };
     }
     await sleep(POLITENESS_MS);
   }
-  return 'ok';
+  return { res: 'ok' };
 }
 
 async function doSelfChain(jobId: string): Promise<void> {
@@ -494,21 +530,23 @@ async function processJob(jobId: string): Promise<void> {
       job,
     };
 
-    let res: 'ok' | 'chained' | 'cancelled';
+    let res: RangeOutcome;
     if (job.kind === 'sync-novel') res = await runSyncNovel(sb, job, source, base, st);
     else if (job.kind === 'sync-all') res = await runSyncAll(sb, job, source, base, st);
     else if (job.kind === 'check-updates') res = await runCheckUpdates(sb, job, source, base, st);
     else throw new Error(`kind không hỗ trợ: ${job.kind}`);
 
-    if (res === 'ok') {
+    if (res.res === 'ok') {
       await updateJob(sb, job.id, {
         status: 'done',
         done: st.prog.total,
         total: st.prog.total,
         skipped: st.prog.skipped,
+        // Ghi chú van an toàn (vd dừng sau 50 lỗi liên tiếp) vào error để admin thấy
+        ...(res.note ? { error: res.note } : {}),
         heartbeat_at: nowIso(),
       });
-    } else if (res === 'cancelled') {
+    } else if (res.res === 'cancelled') {
       await updateJob(sb, job.id, { status: 'cancelled', heartbeat_at: nowIso() });
     }
     // 'chained': invocation tiếp theo lo phần còn lại; giữ status 'running'.
