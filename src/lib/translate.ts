@@ -6,7 +6,7 @@ import { composeAICover, loadImage } from '../components/CoverGenerator';
  * Key do admin thêm trong Admin → 🤖 Gemini (chỉ lưu key đã test OK).
  */
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-3.8-flash'; // API Gemini yêu cầu dùng model này thay cho 2.0-flash đã ngừng
 const LIST_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const CHUNK_LIMIT = 6000; // ký tự tối đa mỗi chunk gửi dịch
 const REQUEST_TIMEOUT_MS = 60000;
