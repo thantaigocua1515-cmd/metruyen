@@ -6,6 +6,17 @@ import { fetchEquippedItems } from '../lib/equipped';
 import type { EquippedItem } from '../lib/equipped';
 import { getRank, formatHours } from '../lib/tuvi';
 import AvatarWithFrame from '../components/AvatarWithFrame';
+import UserTitle from '../components/UserTitle';
+import { QuestPanel, AchievementPanel, TitlePanel } from '../components/GamificationPanels';
+import { syncStateStats } from '../lib/gamification';
+
+type SubTab = 'quests' | 'achievements' | 'titles';
+
+const SUBTABS: { id: SubTab; label: string }[] = [
+  { id: 'quests', label: '🎯 Nhiệm vụ' },
+  { id: 'achievements', label: '🏅 Thành tựu' },
+  { id: 'titles', label: '👑 Danh hiệu' },
+];
 
 export default function Profile() {
   const { user, profile, refreshProfile } = useAuth();
@@ -13,6 +24,7 @@ export default function Profile() {
   const [treasure, setTreasure] = useState<EquippedItem | null>(null);
   const [shelfCount, setShelfCount] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [subTab, setSubTab] = useState<SubTab>('quests');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -26,6 +38,8 @@ export default function Profile() {
       .select('novel_id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .then(({ count }) => setShelfCount(count ?? 0));
+    // Đồng bộ chỉ số thành tựu/nhiệm vụ từ trạng thái hiện tại
+    void syncStateStats(user.id);
   }, [user, profile?.avatar_url]);
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +65,7 @@ export default function Profile() {
         .eq('id', user.id);
       if (uErr) throw uErr;
       await refreshProfile();
+      void syncStateStats(user.id);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Upload avatar thất bại.');
     } finally {
@@ -82,6 +97,7 @@ export default function Profile() {
               size={120}
               username={profile.username}
             />
+            <UserTitle userId={user.id} />
             <input
               ref={fileRef}
               type="file"
@@ -144,6 +160,28 @@ export default function Profile() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Nhiệm vụ / Thành tựu / Danh hiệu */}
+      <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto">
+        {SUBTABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-bold ${
+              subTab === t.id
+                ? 'bg-amber-700 text-white dark:bg-amber-600'
+                : 'border border-amber-700/40 text-amber-800 dark:border-amber-500/40 dark:text-amber-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3">
+        {subTab === 'quests' && <QuestPanel userId={user.id} />}
+        {subTab === 'achievements' && <AchievementPanel userId={user.id} />}
+        {subTab === 'titles' && <TitlePanel userId={user.id} />}
       </div>
     </div>
   );

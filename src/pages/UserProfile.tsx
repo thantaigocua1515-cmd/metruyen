@@ -5,6 +5,7 @@ import { getRank, formatHours } from '../lib/tuvi';
 import { fetchEquippedItems } from '../lib/equipped';
 import type { EquippedItem } from '../lib/equipped';
 import AvatarWithFrame from '../components/AvatarWithFrame';
+import UserTitle from '../components/UserTitle';
 import { useAuth } from '../context/AuthContext';
 
 interface ProfileRow {
@@ -92,6 +93,9 @@ export default function UserProfile() {
         <h1 className="font-display mt-4 text-2xl font-bold text-amber-950 dark:text-amber-100">
           {profile.username}
         </h1>
+        <div className="mt-1 flex justify-center">
+          <UserTitle userId={profile.id} />
+        </div>
         {profile.role === 'admin' && (
           <span className="mt-1 inline-block rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
             👑 Quản trị viên
