@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { isSupabaseConfigured } from './lib/supabase';
 import Navbar from './components/Navbar';
 import BottomTabBar from './components/BottomTabBar';
+import { PresenceBootstrap } from './components/OnlineUsers';
 import Home from './pages/Home';
 import NovelDetail from './pages/NovelDetail';
 import Reader from './pages/Reader';
@@ -134,6 +135,7 @@ export default function App() {
               📚 Mê Truyện — thư các tu tiên · đọc để tăng tu vi
             </footer>
             <BottomTabBar />
+            <PresenceBootstrap />
           </div>
         </HashRouter>
         </AuthProvider>

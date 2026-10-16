@@ -3,8 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import { getSupabase } from '../lib/supabase';
 import { fetchNovelDetail } from '../lib/novelApi';
 import type { ApiSourceRow, NovelDetail as NovelDetailType } from '../lib/novelApi';
+import { getSyncedNovel, getSyncedNovelChapterList } from '../lib/library';
 import { useAuth } from '../context/AuthContext';
 import ReaderView from '../components/ReaderView';
+import { updatePresenceReading } from '../lib/presence';
 
 /** +1 linh thạch mỗi 5 phút đọc (300 giây). */
 const STONES_PER_5MIN = 1;
@@ -22,11 +24,55 @@ export default function Reader() {
 
   const chapterNum = Math.max(1, parseInt(chapter ?? '1', 10) || 1);
 
+  // Báo cho mọi người biết mình đang đọc truyện gì, chương mấy
+  useEffect(() => {
+    if (detail && novelId) {
+      void updatePresenceReading({
+        novel_id: `${sourceId}:${detail.id}`,
+        novel_title: detail.title,
+        chapter: chapterNum,
+      });
+    }
+  }, [detail?.title, novelId, sourceId, chapterNum]);
+
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!sourceId || !novelId) return;
       try {
+        if (sourceId === 'manual') {
+          // Truyện nhập tay: đọc trực tiếp từ DB
+          const row = await getSyncedNovel(`${sourceId}:${novelId}`);
+          if (!row) throw new Error('Không tìm thấy truyện.');
+          const syncedList = await getSyncedNovelChapterList(row.id).catch(() => []);
+          const src: ApiSourceRow = {
+            id: 'manual',
+            name: '📝 Nhập tay',
+            openapi_url: '',
+            base_url: null,
+            is_active: true,
+          };
+          const d: NovelDetailType = {
+            sourceId: 'manual',
+            sourceName: '📝 Nhập tay',
+            id: row.api_id,
+            title: row.title,
+            author: row.author,
+            description: row.description,
+            coverUrl: row.cover_url,
+            chaptersCount: row.chapters_count,
+            translatedChaptersCount: row.translated_count,
+            status: row.status,
+            links: {},
+            chapters: syncedList,
+            chaptersVirtual: false,
+          };
+          if (alive) {
+            setSource(src);
+            setDetail(d);
+          }
+          return;
+        }
         const supabase = getSupabase();
         const { data: sRow, error: sErr } = await supabase
           .from('api_sources')
