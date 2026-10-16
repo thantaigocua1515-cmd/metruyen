@@ -16,6 +16,34 @@ const TRANSLATE_PROMPT =
   'văn phong truyện tu tiên/huyền huyễn mượt mà, giữ nguyên tên riêng và thuật ngữ, ' +
   'không thêm bớt hay bình luận, chỉ trả về bản dịch:';
 
+export interface TranslationStyleRow {
+  id: string;
+  name: string;
+  prompt: string;
+  is_default: boolean;
+}
+
+/** Đọc danh sách phong cách dịch (bọc try/catch — trả [] khi lỗi). */
+export async function getTranslationStyles(): Promise<TranslationStyleRow[]> {
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('translation_styles')
+      .select('id,name,prompt,is_default')
+      .order('created_at');
+    if (error) throw error;
+    return (data ?? []) as TranslationStyleRow[];
+  } catch {
+    return [];
+  }
+}
+
+export interface TranslateOptions {
+  /** Prompt phong cách dịch (thay prompt mặc định khi có). */
+  stylePrompt?: string;
+  onProgress?: (done: number, total: number) => void;
+}
+
 export interface GeminiKeyRow {
   id: string;
   label: string;
@@ -93,7 +121,7 @@ interface GenerateContentResponse {
   error?: { message?: string; status?: string };
 }
 
-async function translateChunk(chunk: string, key: string): Promise<string> {
+async function translateChunk(chunk: string, key: string, prompt: string): Promise<string> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -104,7 +132,7 @@ async function translateChunk(chunk: string, key: string): Promise<string> {
         headers: { 'Content-Type': 'application/json' },
         signal: ctrl.signal,
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `${TRANSLATE_PROMPT}\n\n${chunk}` }] }],
+          contents: [{ parts: [{ text: `${prompt}\n\n${chunk}` }] }],
           generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
         }),
       },
@@ -140,10 +168,11 @@ function errMsg(e: unknown): string {
 /**
  * Dịch toàn bộ text. Mỗi chunk thử xoay vòng các key (bắt đầu lệch nhau
  * để chia tải); key nào lỗi → thử key tiếp theo. Hết key → throw tiếng Việt.
+ * opts.stylePrompt: phong cách dịch tùy chọn (mặc định dùng prompt tu tiên).
  */
 export async function translateText(
   text: string,
-  onProgress?: (done: number, total: number) => void,
+  opts?: TranslateOptions,
 ): Promise<string> {
   const src = text.trim();
   if (!src) throw new Error('Chưa có nội dung để dịch.');
@@ -151,6 +180,8 @@ export async function translateText(
   if (keys.length === 0) {
     throw new Error('Chưa có Gemini API key nào đang bật. Vào Admin → 🤖 Gemini để thêm key.');
   }
+  const prompt =
+    opts?.stylePrompt && opts.stylePrompt.trim() ? opts.stylePrompt.trim() : TRANSLATE_PROMPT;
   const chunks = chunkText(src);
   const out: string[] = [];
   for (let i = 0; i < chunks.length; i++) {
@@ -159,7 +190,7 @@ export async function translateText(
     for (let a = 0; a < keys.length; a++) {
       const k = keys[(i + a) % keys.length];
       try {
-        translated = await translateChunk(chunks[i], k.api_key);
+        translated = await translateChunk(chunks[i], k.api_key, prompt);
         break;
       } catch (e) {
         lastErr = e; // thử key tiếp theo
@@ -172,7 +203,7 @@ export async function translateText(
       );
     }
     out.push(translated);
-    onProgress?.(i + 1, chunks.length);
+    opts?.onProgress?.(i + 1, chunks.length);
   }
   return out.join('\n\n');
 }

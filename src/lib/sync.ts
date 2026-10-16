@@ -85,7 +85,12 @@ export interface ChapterRangeResult {
   synced: number;
   skipped: number[];
   stopped: boolean;
+  /** Ghi chú khi dừng sớm (vd: 50 lỗi liên tiếp). */
+  note?: string;
 }
+
+// Van an toàn: dừng sau N lỗi LIÊN TIẾP (coi như đã hết chương / API lỗi hẳn).
+const MAX_CONSECUTIVE_ERRORS = 50;
 
 /** Đồng bộ nội dung các chương [from..to], bỏ qua chương đã có. Dùng chung cho sync đầy đủ và cập nhật. */
 async function syncChapterRange(
@@ -106,6 +111,7 @@ async function syncChapterRange(
   let synced = 0;
   const skipped: number[] = [];
   let done = 0;
+  let consecutiveErrors = 0;
   for (const n of targets) {
     if (shouldStop?.()) return { synced, skipped, stopped: true };
     try {
@@ -122,8 +128,18 @@ async function syncChapterRange(
       );
       if (error) throw error;
       synced++;
+      consecutiveErrors = 0;
     } catch {
       skipped.push(n); // chương lỗi → bỏ qua, tiếp tục
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        return {
+          synced,
+          skipped,
+          stopped: true,
+          note: `Dừng sau ${MAX_CONSECUTIVE_ERRORS} lỗi liên tiếp (tới chương ${n}) — có thể đã hết chương đọc được hoặc API lỗi.`,
+        };
+      }
     }
     done++;
     onProgress?.(done, targets.length, n);
@@ -199,22 +215,25 @@ export async function syncChapters(
   const supabase = getSupabase();
   const { data: row, error: rowErr } = await supabase
     .from('synced_novels')
-    .select('api_id,translated_count')
+    .select('api_id,translated_count,chapters_count')
     .eq('id', key)
     .single();
   if (rowErr || !row) {
     throw new Error('Truyện chưa có trong database — hãy "Đồng bộ danh sách truyện" trước.');
   }
   const apiId = (row as { api_id: string }).api_id;
-  let translated = (row as { translated_count: number }).translated_count ?? 0;
+  // Một số truyện API báo translated_count=0 nhưng endpoint chương vẫn trả nội dung
+  // → lấy max để không bao giờ sync 0 chương.
+  const rowCounts = row as { translated_count: number; chapters_count: number };
+  let translated = Math.max(rowCounts.translated_count ?? 0, rowCounts.chapters_count ?? 0);
   // Lấy số chương mới nhất từ API trước khi sync
   try {
     const d = await fetchNovelDetail(source, apiId);
-    translated = d.translatedChaptersCount || translated;
+    translated = Math.max(d.translatedChaptersCount, d.chaptersCount, translated);
     await supabase
       .from('synced_novels')
       .update({
-        translated_count: translated,
+        translated_count: d.translatedChaptersCount,
         chapters_count: d.chaptersCount,
         title: d.title,
         last_synced_at: new Date().toISOString(),
@@ -248,12 +267,18 @@ export async function checkUpdates(source: ApiSourceRow): Promise<CheckUpdatesRe
   const list = await fetchNovels(source);
   const { data: rows } = await supabase
     .from('synced_novels')
-    .select('id,api_id,title,translated_count')
+    .select('id,api_id,title,translated_count,chapters_count')
     .eq('source_id', source.id);
   const byApiId = new Map(
-    ((rows ?? []) as { id: string; api_id: string; title: string; translated_count: number }[]).map(
-      (r) => [r.api_id, r],
-    ),
+    (
+      (rows ?? []) as {
+        id: string;
+        api_id: string;
+        title: string;
+        translated_count: number;
+        chapters_count: number;
+      }[]
+    ).map((r) => [r.api_id, r]),
   );
   const newNovels: string[] = [];
   const updated: NovelUpdate[] = [];
@@ -264,6 +289,9 @@ export async function checkUpdates(source: ApiSourceRow): Promise<CheckUpdatesRe
     try {
       const d = await fetchNovelDetail(source, n.id);
       const key = novelKey(source.id, n.id);
+      // Dùng max(translated, chapters) — API có truyện báo translated=0 nhưng vẫn có nội dung.
+      const apiTotal = Math.max(d.translatedChaptersCount, d.chaptersCount);
+      const curTotal = cur ? Math.max(cur.translated_count ?? 0, cur.chapters_count ?? 0) : 0;
       if (!cur) {
         // Truyện mới → lưu metadata trước, chương đồng bộ sau
         const { error } = await supabase.from('synced_novels').upsert(
@@ -284,15 +312,9 @@ export async function checkUpdates(source: ApiSourceRow): Promise<CheckUpdatesRe
         );
         if (error) throw error;
         newNovels.push(d.title);
-      } else if (d.translatedChaptersCount > cur.translated_count) {
+      } else if (apiTotal > curTotal) {
         // Có chương mới → chỉ sync các chương mới
-        const r = await syncChapterRange(
-          source,
-          cur.id,
-          n.id,
-          cur.translated_count + 1,
-          d.translatedChaptersCount,
-        );
+        const r = await syncChapterRange(source, cur.id, n.id, curTotal + 1, apiTotal);
         await supabase
           .from('synced_novels')
           .update({
