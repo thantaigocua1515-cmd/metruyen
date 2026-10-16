@@ -13,6 +13,7 @@ import {
   type Period,
   type QuestView,
 } from '../lib/gamification';
+import { titleAnimClass, titleStyle } from './UserTitle';
 
 const card =
   'rounded-2xl border border-amber-900/15 bg-white p-4 shadow-sm dark:border-amber-100/10 dark:bg-stone-900';
@@ -302,13 +303,12 @@ export function TitlePanel({ userId }: { userId: string }) {
   return (
     <div className="space-y-2">
       {titles.map((t) => {
-        const anim = t.animation === 'shine' ? 'title-shine' : t.animation === 'blink' ? 'title-blink' : '';
         return (
           <div key={t.id} className={`${card} flex items-center justify-between gap-3`}>
             <div className="min-w-0">
               <span
-                className={`user-title ${anim}`}
-                style={{ color: t.color, textShadow: `0 0 8px ${t.glow}, 0 0 20px ${t.glow}` }}
+                className={`user-title ${titleAnimClass(t.animation)}`}
+                style={titleStyle(t)}
               >
                 {t.name}
               </span>
