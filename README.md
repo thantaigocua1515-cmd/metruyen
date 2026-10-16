@@ -280,3 +280,13 @@ SQL 1 lần trên Supabase live (xem mục 1).
 
 **Lưu ý:** chỉ nhập/dịch nội dung bạn có quyền sử dụng. Không có chức năng cào
 web tự động.
+
+## 10. Thumbnail AI: Gemini + Cloudflare dự phòng
+
+- Nút **✨ Tạo bằng AI** (tab 🖼️ Thumbnails): thử **Gemini** (`gemini-3.1-flash-image`) trước;
+  nếu lỗi/hết quota thì tự chuyển sang **Cloudflare Workers AI** (FLUX.1-schnell, miễn phí
+  10.000 Neurons/ngày). Prompt ảnh dựa trên tên truyện + tóm tắt mô tả.
+- Cloudflare chạy qua Worker proxy của bạn (giữ API token an toàn, không lộ ra trình duyệt):
+  code worker + hướng dẫn từng bước trong `cloudflare-worker/` (`worker.js`, `HUONG-DAN.md`).
+- Cấu hình Worker URL + Secret trong tab 🖼️ Thumbnails → mục ☁️ Cloudflare Workers AI
+  (lưu ở bảng `cloudflare_config`, chỉ admin). Chạy migration SQL `cloudflare_config` một lần.

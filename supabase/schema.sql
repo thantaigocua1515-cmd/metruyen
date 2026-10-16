@@ -537,3 +537,21 @@ create policy translation_glossary_admin_all on public.translation_glossary
   with check (public.is_admin());
 grant all on public.translation_glossary to authenticated;
 -- KHÔNG có policy public: chỉ admin đọc/ghi (giống gemini_keys).
+
+-- 25. cloudflare_config: cấu hình Worker proxy cho Workers AI (nguồn ảnh dự phòng) --
+create table if not exists public.cloudflare_config (
+  id int primary key,
+  worker_url text not null default '',
+  worker_secret text not null default '',
+  enabled boolean not null default true,
+  updated_at timestamptz not null default now(),
+  constraint cloudflare_config_single_row check (id = 1)
+);
+alter table public.cloudflare_config enable row level security;
+drop policy if exists cloudflare_config_admin_all on public.cloudflare_config;
+create policy cloudflare_config_admin_all on public.cloudflare_config
+  for all to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+grant all on public.cloudflare_config to authenticated;
+-- KHÔNG có policy public: chỉ admin đọc/ghi (giống gemini_keys).

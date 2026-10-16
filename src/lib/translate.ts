@@ -213,7 +213,7 @@ export async function translateText(
 const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image'; // model tạo ảnh hiện tại (Nano Banana 2)
 const IMAGE_REQUEST_TIMEOUT_MS = 120000;
 
-function buildCoverImagePrompt(title: string, description?: string | null): string {
+export function buildCoverImagePrompt(title: string, description?: string | null): string {
   const clean = title
     .replace(/[^\p{L}\p{N}\s:·—–-]/gu, '')
     .replace(/\s+/g, ' ')
