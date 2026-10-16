@@ -252,8 +252,14 @@ export async function touchLogin(userId: string): Promise<void> {
 
 /** Trao bù danh hiệu rank cho cấp hiện tại (user cũ đã tu luyện từ trước) —
  * lặng lẽ, không đổi danh hiệu đang đeo (trừ khi chưa đeo cái nào).
- * Trả về số danh hiệu đã trao (để debug). */
-export async function ensureRankTitles(userId: string): Promise<number> {
+ * Trả về chẩn đoán để hiển thị khi cần debug. */
+export async function ensureRankTitles(
+  userId: string,
+): Promise<{ granted: number; detail: string }> {
+  const fail = (detail: string) => {
+    console.warn('[gamification] ensureRankTitles:', detail);
+    return { granted: 0, detail };
+  };
   try {
     const sb = getSupabase();
     const { data: prof, error: pErr } = await sb
@@ -261,38 +267,27 @@ export async function ensureRankTitles(userId: string): Promise<number> {
       .select('reading_seconds')
       .eq('id', userId)
       .single();
-    if (pErr) {
-      console.warn('[gamification] ensureRankTitles: profiles error', pErr.message);
-      return 0;
-    }
-    if (!prof) return 0;
+    if (pErr) return fail(`Lỗi đọc profiles: ${pErr.message}`);
+    if (!prof) return fail('Không tìm thấy hồ sơ user');
     const idx = getRank((prof as { reading_seconds: number }).reading_seconds / 3600).index;
     const { data: titles, error: tErr } = await sb
       .from('titles')
       .select('id, code')
       .like('code', 'rank_%')
       .eq('is_active', true);
-    if (tErr) {
-      console.warn('[gamification] ensureRankTitles: titles error', tErr.message);
-      return 0;
-    }
+    if (tErr) return fail(`Lỗi đọc bảng titles: ${tErr.message}`);
     const list = (titles ?? []) as { id: string; code: string }[];
-    if (list.length === 0) {
-      console.warn('[gamification] ensureRankTitles: bảng titles trống!');
-      return 0;
-    }
+    if (list.length === 0)
+      return fail('Bảng titles đang trống — chưa chạy seed danh hiệu trong migration');
     const wanted = new Set(Array.from({ length: idx + 1 }, (_, i) => `rank_${i}`));
     const rows = list
       .filter((t) => wanted.has(t.code))
       .map((t) => ({ user_id: userId, title_id: t.id }));
-    if (rows.length === 0) return 0;
+    if (rows.length === 0) return fail('Không tìm thấy danh hiệu rank phù hợp');
     const { error: uErr } = await sb
       .from('user_titles')
       .upsert(rows, { onConflict: 'user_id,title_id', ignoreDuplicates: true });
-    if (uErr) {
-      console.warn('[gamification] ensureRankTitles: upsert error', uErr.message);
-      return 0;
-    }
+    if (uErr) return fail(`Không ghi được vào user_titles (RLS?): ${uErr.message}`);
     // nếu chưa đeo danh hiệu nào thì đeo luôn cái cao nhất
     const { count } = await sb
       .from('user_titles')
@@ -309,11 +304,11 @@ export async function ensureRankTitles(userId: string): Promise<number> {
           .eq('title_id', top.id);
       }
     }
-    console.info(`[gamification] ensureRankTitles: đã trao ${rows.length} danh hiệu rank cho ${userId}`);
-    return rows.length;
+    const detail = `Đã trao ${rows.length} danh hiệu rank (cấp ${idx})`;
+    console.info('[gamification] ensureRankTitles:', detail);
+    return { granted: rows.length, detail };
   } catch (e) {
-    console.warn('[gamification] ensureRankTitles: exception', e);
-    return 0;
+    return fail(`Lỗi không ngờ: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 

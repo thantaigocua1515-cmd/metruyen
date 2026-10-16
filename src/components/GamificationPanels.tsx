@@ -291,9 +291,15 @@ export function TitlePanel({ userId }: { userId: string }) {
 
   const retry = async () => {
     setLoading(true);
-    await ensureRankTitles(userId);
-    setTitles(await getMyTitles(userId));
+    const r = await ensureRankTitles(userId);
+    const list = await getMyTitles(userId);
+    setTitles(list);
     setLoading(false);
+    if (list.length === 0) {
+      alert(`🔍 Chẩn đoán: ${r.detail}\n\nChụp màn hình này gửi mình nhé!`);
+    } else {
+      toast(`👑 Đã nhận ${list.length} danh hiệu!`);
+    }
   };
 
   const equip = async (t: MyTitle) => {
