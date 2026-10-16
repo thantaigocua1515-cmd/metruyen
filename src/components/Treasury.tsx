@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getSupabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { syncStateStats } from '../lib/gamification';
 
 export interface CosmeticItem {
   id: string;
@@ -75,6 +76,7 @@ export default function Treasury() {
       if (iErr && !iErr.message.toLowerCase().includes('duplicate')) throw iErr;
       await refreshProfile();
       await load();
+      void syncStateStats(user.id);
       alert(`Đã mua "${item.name}"! Vào Túi Trữ Vật để trang bị.`);
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Mua thất bại.');

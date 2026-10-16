@@ -3,6 +3,7 @@ import { fetchChapterContent } from '../lib/novelApi';
 import type { ApiSourceRow, ChapterMeta, NovelSummary } from '../lib/novelApi';
 import { getSyncedChapter } from '../lib/library';
 import { getSupabase } from '../lib/supabase';
+import { bumpStat } from '../lib/gamification';
 
 interface Block {
   num: number;
@@ -63,6 +64,19 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
           },
           { onConflict: 'user_id,source_id,novel_id' },
         );
+        // Gamification: đếm chương đã đọc, cú đêm (0–5h), số truyện khác nhau
+        void bumpStat(userId, 'read_chapters', 1);
+        const h = new Date().getHours();
+        if (h >= 0 && h < 5) void bumpStat(userId, 'night_reads', 1);
+        try {
+          const { count } = await supabase
+            .from('reading_progress')
+            .select('novel_id', { count: 'exact', head: true })
+            .eq('user_id', userId);
+          if (count != null) void bumpStat(userId, 'novels_read', count, 'set');
+        } catch {
+          /* bỏ qua */
+        }
       } catch {
         /* lưu tiến độ thất bại thì bỏ qua, không chặn đọc */
       }

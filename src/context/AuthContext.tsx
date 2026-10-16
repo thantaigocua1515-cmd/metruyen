@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { getSupabase } from '../lib/supabase';
+import { touchLogin, ensureQuestRows } from '../lib/gamification';
 
 export interface Profile {
   id: string;
@@ -70,14 +71,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       setUser(data.session?.user ?? null);
       if (data.session?.user) {
-        setProfile(await loadProfile(data.session.user.id));
+        const uid = data.session.user.id;
+        setProfile(await loadProfile(uid));
+        // Gamification: điểm danh + tạo dòng nhiệm vụ kỳ hiện tại
+        void touchLogin(uid);
+        void ensureQuestRows(uid);
       }
       setLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        setProfile(await loadProfile(session.user.id));
+        const uid = session.user.id;
+        setProfile(await loadProfile(uid));
+        void touchLogin(uid);
+        void ensureQuestRows(uid);
       } else {
         setProfile(null);
       }

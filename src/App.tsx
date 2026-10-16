@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from './lib/supabase';
 import Navbar from './components/Navbar';
 import BottomTabBar from './components/BottomTabBar';
 import { PresenceBootstrap } from './components/OnlineUsers';
+import ToastHost from './components/ToastHost';
 import Home from './pages/Home';
 import NovelDetail from './pages/NovelDetail';
 import Reader from './pages/Reader';
@@ -136,6 +137,7 @@ export default function App() {
             </footer>
             <BottomTabBar />
             <PresenceBootstrap />
+            <ToastHost />
           </div>
         </HashRouter>
         </AuthProvider>

@@ -7,6 +7,7 @@ import { getSyncedNovel, getSyncedNovelChapterList } from '../lib/library';
 import { useAuth } from '../context/AuthContext';
 import ReaderView from '../components/ReaderView';
 import { updatePresenceReading } from '../lib/presence';
+import { bumpStat, checkRankUp } from '../lib/gamification';
 
 /** +1 linh thạch mỗi 5 phút đọc (300 giây). */
 const STONES_PER_5MIN = 1;
@@ -113,6 +114,7 @@ export default function Reader() {
         accSeconds += 60;
         const earned =
           Math.floor(accSeconds / 300) - Math.floor((accSeconds - 60) / 300);
+        const oldSeconds = row.reading_seconds;
         await supabase
           .from('profiles')
           .update({
@@ -121,6 +123,10 @@ export default function Reader() {
           })
           .eq('id', user.id);
         await supabase.from('reading_sessions').insert({ user_id: user.id, seconds: 60 });
+        // Gamification: cộng chỉ số nhiệm vụ/thành tựu + kiểm tra tăng cấp tu vi
+        void bumpStat(user.id, 'read_seconds', 60);
+        if (earned > 0) void bumpStat(user.id, 'stones_earned', earned * STONES_PER_5MIN);
+        void checkRankUp(user.id, oldSeconds, oldSeconds + 60);
         void refreshProfile();
       } catch {
         /* lỗi mạng thì bỏ qua tick này */

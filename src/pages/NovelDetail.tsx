@@ -3,8 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getSupabase } from '../lib/supabase';
 import { fetchNovelDetail } from '../lib/novelApi';
 import type { ApiSourceRow, NovelDetail as NovelDetailType } from '../lib/novelApi';
-import { getSyncedNovelChapterList } from '../lib/library';
+import { getSyncedNovel, getSyncedNovelChapterList } from '../lib/library';
 import { useAuth } from '../context/AuthContext';
+import { syncStateStats } from '../lib/gamification';
 
 const PAGE_SIZE = 80;
 
@@ -30,26 +31,50 @@ export default function NovelDetail() {
       setError(null);
       try {
         const supabase = getSupabase();
-        const { data: sRow, error: sErr } = await supabase
-          .from('api_sources')
-          .select('id,name,openapi_url,base_url,is_active')
-          .eq('id', sourceId)
-          .single();
-        if (sErr || !sRow) throw new Error('Không tìm thấy nguồn truyện.');
-        const src = sRow as ApiSourceRow;
-        const d = await fetchNovelDetail(src, novelId);
+        let d: NovelDetailType;
         // Ưu tiên mục lục THẬT từ database đã đồng bộ (tiêu đề chương thật,
         // chính xác hơn danh sách ảo sinh từ số lượng)
         let db = false;
-        try {
-          const syncedList = await getSyncedNovelChapterList(`${sourceId}:${novelId}`);
-          if (syncedList.length > 0) {
-            d.chapters = syncedList;
-            d.chaptersVirtual = false;
-            db = true;
+        if (sourceId === 'manual') {
+          // Truyện nhập tay: đọc trực tiếp từ DB, không qua api_sources
+          const row = await getSyncedNovel(`${sourceId}:${novelId}`);
+          if (!row) throw new Error('Không tìm thấy truyện.');
+          const syncedList = await getSyncedNovelChapterList(row.id).catch(() => []);
+          db = syncedList.length > 0;
+          d = {
+            sourceId: 'manual',
+            sourceName: '📝 Nhập tay',
+            id: row.api_id,
+            title: row.title,
+            author: row.author,
+            description: row.description,
+            coverUrl: row.cover_url,
+            chaptersCount: row.chapters_count,
+            translatedChaptersCount: row.translated_count,
+            status: row.status,
+            links: {},
+            chapters: syncedList,
+            chaptersVirtual: false,
+          };
+        } else {
+          const { data: sRow, error: sErr } = await supabase
+            .from('api_sources')
+            .select('id,name,openapi_url,base_url,is_active')
+            .eq('id', sourceId)
+            .single();
+          if (sErr || !sRow) throw new Error('Không tìm thấy nguồn truyện.');
+          const src = sRow as ApiSourceRow;
+          d = await fetchNovelDetail(src, novelId);
+          try {
+            const syncedList = await getSyncedNovelChapterList(`${sourceId}:${novelId}`);
+            if (syncedList.length > 0) {
+              d.chapters = syncedList;
+              d.chaptersVirtual = false;
+              db = true;
+            }
+          } catch {
+            /* bảng chưa có / lỗi DB → dùng mục lục API như cũ */
           }
-        } catch {
-          /* bảng chưa có / lỗi DB → dùng mục lục API như cũ */
         }
         const { data: ov } = await supabase
           .from('thumbnail_overrides')
@@ -123,6 +148,7 @@ export default function NovelDetail() {
         );
         setInShelf(true);
       }
+      void syncStateStats(user.id);
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Thao tác tủ truyện thất bại.');
     }
