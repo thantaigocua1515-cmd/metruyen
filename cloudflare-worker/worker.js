@@ -17,7 +17,9 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, x-worker-key',
 };
 
-// Model vẽ ảnh của Cloudflare (FLUX.1-schnell — nhanh, rẻ neuron)
+// Model vẽ ảnh của Cloudflare (FLUX.1-schnell — nhanh, rẻ neuron).
+// Lưu ý: model này chỉ nhận { prompt } — không nhận width/height/num_steps.
+// Ảnh trả về sẽ được web cắt/ghép vừa khung bìa 768x1152.
 const IMAGE_MODEL = '@cf/black-forest-labs/flux-1-schnell';
 
 export default {
@@ -63,12 +65,7 @@ export default {
           Authorization: `Bearer ${env.CF_API_TOKEN}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          prompt,
-          width: 768,
-          height: 1152,
-          num_steps: 4,
-        }),
+        body: JSON.stringify({ prompt }),
       },
     );
 
