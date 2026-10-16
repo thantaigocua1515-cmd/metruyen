@@ -7,6 +7,12 @@ import { syncNovelList, syncChapters, checkUpdates } from '../lib/sync';
 import { getSyncedNovels } from '../lib/library';
 import type { SyncedNovelRow } from '../lib/library';
 import { testGeminiKey, translateText, generateGeminiCover, getActiveKeys } from '../lib/translate';
+import {
+  getCloudflareConfig,
+  saveCloudflareConfig,
+  generateCloudflareCover,
+  testCloudflareWorker,
+} from '../lib/cloudflare';
 import { uploadCover } from '../components/CoverGenerator';
 import ChapterManager from '../components/admin/ChapterManager';
 import GlossaryManager from '../components/admin/GlossaryManager';
@@ -375,6 +381,7 @@ function NovelThumbRow({
 }) {
   const [url, setUrl] = useState(current ?? '');
   const [busy, setBusy] = useState(false);
+  const [lastSource, setLastSource] = useState('');
 
   useEffect(() => {
     setUrl(current ?? '');
@@ -424,17 +431,38 @@ function NovelThumbRow({
   const genAI = async () => {
     if (busy) return;
     const keys = await getActiveKeys();
-    if (keys.length === 0) {
-      alert('Chưa có Gemini API key nào đang bật. Vào tab 🤖 Gemini để thêm key trước nhé.');
+    const cf = await getCloudflareConfig().catch(() => null);
+    const canGemini = keys.length > 0;
+    const canCf = !!cf?.enabled && !!cf.worker_url.trim();
+    if (!canGemini && !canCf) {
+      alert(
+        'Chưa có nguồn AI nào. Thêm Gemini key (tab 🤖 Gemini) hoặc cấu hình Cloudflare Worker ở mục ☁️ bên dưới nhé.',
+      );
       return;
     }
     setBusy(true);
     try {
-      // Chỉ dùng Gemini — prompt ảnh dựa trên tên truyện + tóm tắt mô tả
-      const blob = await generateGeminiCover(novel.title, novel.author, novel.description);
+      // Gemini trước → lỗi/hết quota thì tự chuyển sang Cloudflare
+      let blob: Blob | null = null;
+      let used = '';
+      let geminiErr = '';
+      if (canGemini) {
+        try {
+          blob = await generateGeminiCover(novel.title, novel.author, novel.description);
+          used = 'Gemini';
+        } catch (e) {
+          geminiErr = e instanceof Error ? e.message : 'lỗi không rõ';
+        }
+      }
+      if (!blob) {
+        if (!canCf) throw new Error(geminiErr || 'Gemini thất bại.');
+        blob = await generateCloudflareCover(novel.title, novel.author, novel.description);
+        used = 'Cloudflare';
+      }
       const publicUrl = await uploadCover(blob, novel.sourceId, novel.id);
       setUrl(publicUrl);
       await save(publicUrl);
+      setLastSource(used);
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Tạo thumbnail thất bại.');
     } finally {
@@ -464,12 +492,113 @@ function NovelThumbRow({
           <button onClick={() => void genAI()} disabled={busy} className={btnGhost}>
             {busy ? '...' : '✨ Tạo bằng AI'}
           </button>
+          {lastSource && (
+            <span className="self-center text-xs text-stone-500 dark:text-stone-400">
+              Đã tạo bằng {lastSource}
+            </span>
+          )}
           {current && (
             <button onClick={() => void remove()} className={btnGhost}>
               Gỡ override
             </button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Cấu hình Cloudflare Workers AI (nguồn ảnh dự phòng) ---------------- */
+function CloudflareConfigCard() {
+  const [url, setUrl] = useState('');
+  const [secret, setSecret] = useState('');
+  const [enabled, setEnabled] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    getCloudflareConfig()
+      .then((c) => {
+        if (c) {
+          setUrl(c.worker_url);
+          setSecret(c.worker_secret);
+          setEnabled(c.enabled);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const save = async () => {
+    if (!url.trim()) {
+      setMsg('Nhập Worker URL trước nhé.');
+      return;
+    }
+    setBusy(true);
+    setMsg('');
+    try {
+      await saveCloudflareConfig({ worker_url: url.trim(), worker_secret: secret.trim(), enabled });
+      setMsg('Đã lưu cấu hình.');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Lưu thất bại.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const test = async () => {
+    setBusy(true);
+    setMsg('Đang kiểm tra (tốn 1 lượt quota)...');
+    try {
+      setMsg(await testCloudflareWorker());
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'Kiểm tra thất bại.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={card}>
+      <p className="font-bold text-stone-900 dark:text-stone-100">
+        ☁️ Cloudflare Workers AI{' '}
+        <span className="text-xs font-normal text-stone-500 dark:text-stone-400">
+          (dự phòng miễn phí — tự dùng khi Gemini lỗi/hết quota)
+        </span>
+      </p>
+      <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        Hướng dẫn lấy Worker URL + Secret: xem file{' '}
+        <code className="rounded bg-stone-100 px-1 dark:bg-stone-800">
+          cloudflare-worker/HUONG-DAN.md
+        </code>{' '}
+        trong repo.
+      </p>
+      <div className="mt-2 space-y-2">
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="Worker URL, ví dụ https://ten-worker.ten-tai-khoan.workers.dev"
+          className={inputCls}
+        />
+        <input
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          placeholder="Worker Secret (chuỗi WORKER_SECRET đã đặt trong worker)"
+          type="password"
+          className={inputCls}
+        />
+        <label className="flex items-center gap-2 text-sm text-stone-700 dark:text-stone-300">
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          Bật nguồn Cloudflare
+        </label>
+        <div className="flex gap-2">
+          <button onClick={() => void save()} disabled={busy} className={btnPrimary}>
+            Lưu
+          </button>
+          <button onClick={() => void test()} disabled={busy} className={btnGhost}>
+            {busy ? '...' : 'Kiểm tra kết nối'}
+          </button>
+        </div>
+        {msg && <p className="text-xs text-stone-600 dark:text-stone-400">{msg}</p>}
       </div>
     </div>
   );
@@ -536,6 +665,7 @@ function ThumbnailsTab() {
 
   return (
     <div className="space-y-3">
+      <CloudflareConfigCard />
       <div className={card}>
         <label className="text-sm font-medium">Nguồn truyện</label>
         <select value={sourceId} onChange={(e) => setSourceId(e.target.value)} className={`${inputCls} mt-1`}>
