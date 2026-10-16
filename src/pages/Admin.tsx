@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTemplate } from '../context/TemplateContext';
 import { TEMPLATES, getTemplateDef } from '../theme/templates';
 
-type Tab = 'overview' | 'users' | 'sources' | 'sync' | 'chapters' | 'glossary' | 'gemini' | 'import' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system';
+type Tab = 'overview' | 'users' | 'sources' | 'sync' | 'chapters' | 'glossary' | 'gemini' | 'import' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system' | 'announce';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: '📊 Tổng quan' },
@@ -36,6 +36,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'items', label: '⚔️ Vật phẩm' },
   { id: 'defaults', label: '🌱 Nhân vật mới' },
   { id: 'theme', label: '🎨 Giao diện' },
+  { id: 'announce', label: '📢 Thiên Đạo' },
   { id: 'system', label: '🖥️ Hệ thống' },
 ];
 
@@ -873,6 +874,128 @@ function ItemsTab() {
             </button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Thông báo thiên đạo ---------------- */
+function AnnounceTab() {
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [history, setHistory] = useState<{ id: string; message: string; created_at: string }[]>([]);
+
+  const loadHistory = async () => {
+    try {
+      const sb = getSupabase();
+      const { data } = await sb
+        .from('announcements')
+        .select('id, message, created_at')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      setHistory((data ?? []) as { id: string; message: string; created_at: string }[]);
+    } catch {
+      /* bỏ qua */
+    }
+  };
+
+  useEffect(() => {
+    void loadHistory();
+  }, []);
+
+  const send = async () => {
+    const msg = message.trim();
+    if (!msg) {
+      alert('Nhập nội dung thông báo đã bro.');
+      return;
+    }
+    if (msg.length > 500) {
+      alert('Thông báo tối đa 500 ký tự.');
+      return;
+    }
+    setSending(true);
+    try {
+      const sb = getSupabase();
+      const { error } = await sb.from('announcements').insert({ message: msg });
+      if (error) throw error;
+      setMessage('');
+      await loadHistory();
+      alert('📜 Đã ban "Thông báo thiên đạo" tới toàn thể tu sĩ đang online!');
+    } catch (e) {
+      alert(`Gửi thất bại: ${e instanceof Error ? e.message : 'lỗi không rõ'}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('Xóa thông báo này?')) return;
+    try {
+      const sb = getSupabase();
+      const { error } = await sb.from('announcements').delete().eq('id', id);
+      if (error) throw error;
+      await loadHistory();
+    } catch (e) {
+      alert(`Xóa thất bại: ${e instanceof Error ? e.message : 'lỗi không rõ'}`);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className={card}>
+        <h3 className="mb-1 font-bold text-stone-900 dark:text-stone-100">
+          📢 Ban "Thông báo thiên đạo"
+        </h3>
+        <p className="mb-3 text-sm text-stone-500 dark:text-stone-400">
+          Mọi tu sĩ đang online sẽ thấy popup ngay lập tức. Dùng để troll bạn bè cũng được 😏
+        </p>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={3}
+          maxLength={500}
+          placeholder='VD: alo — tối nay 8h công thành chiến, ai vắng phạt quét Tàng Kinh Các!'
+          className={inputCls}
+        />
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-xs text-stone-400">{message.length}/500</span>
+          <button onClick={send} disabled={sending || !message.trim()} className={btnPrimary}>
+            {sending ? 'Đang ban...' : '📜 Ban thông báo'}
+          </button>
+        </div>
+      </div>
+
+      <div className={card}>
+        <h3 className="mb-2 font-bold text-stone-900 dark:text-stone-100">
+          🕐 Lịch sử đã ban
+        </h3>
+        {history.length === 0 ? (
+          <p className="text-sm text-stone-500 dark:text-stone-400">Chưa có thông báo nào.</p>
+        ) : (
+          <ul className="space-y-2">
+            {history.map((h) => (
+              <li
+                key={h.id}
+                className="flex items-start justify-between gap-2 rounded-xl bg-stone-50 p-3 dark:bg-stone-800"
+              >
+                <div className="min-w-0">
+                  <p className="whitespace-pre-wrap text-sm text-stone-800 dark:text-stone-200">
+                    {h.message}
+                  </p>
+                  <p className="mt-1 text-xs text-stone-400">
+                    {new Date(h.created_at).toLocaleString('vi-VN')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => remove(h.id)}
+                  className="shrink-0 rounded-full px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-stone-700"
+                >
+                  🗑️
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -2137,6 +2260,7 @@ export default function Admin() {
         {tab === 'items' && <ItemsTab />}
         {tab === 'defaults' && <DefaultsTab />}
         {tab === 'theme' && <ThemeTab />}
+        {tab === 'announce' && <AnnounceTab />}
         {tab === 'system' && <SystemTab />}
       </div>
     </div>
