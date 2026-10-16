@@ -287,7 +287,7 @@ async function generateGeminiImage(key: string, prompt: string): Promise<Blob> {
 
 /**
  * Tạo thumbnail bằng ảnh AI của Gemini (model image-generation), chữ tên
- * truyện/tác giả + khung vàng do canvas vẽ đè (tái sử dụng composeAICover).
+ * truyện/tác giả phong cách tu tiên/điện ảnh do canvas vẽ đè (tái sử dụng composeAICover).
  * Xoay vòng key khi lỗi/quota; hết key → throw lỗi tiếng Việt.
  */
 export async function generateGeminiCover(
