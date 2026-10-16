@@ -553,8 +553,8 @@ export async function getMyTitles(userId: string): Promise<MyTitle[]> {
       .select('earned_at, equipped, titles!inner(id, code, name, color, glow, animation, created_from)')
       .eq('user_id', userId)
       .order('earned_at', { ascending: false });
-    return ((data ?? []) as unknown as { earned_at: string; equipped: boolean; titles: TitleRow[] }[])
-      .map((r) => ({ ...(r.titles[0] as TitleRow), earned_at: r.earned_at, equipped: r.equipped }))
+    return ((data ?? []) as unknown as { earned_at: string; equipped: boolean; titles: TitleRow }[])
+      .map((r) => ({ ...(r.titles as TitleRow), earned_at: r.earned_at, equipped: r.equipped }))
       .filter((t) => !!t.id);
   } catch {
     return [];
@@ -575,8 +575,8 @@ export async function getEquippedTitle(userId: string): Promise<TitleRow | null>
       .eq('user_id', userId)
       .eq('equipped', true)
       .maybeSingle();
-    const row = data as unknown as { titles: TitleRow[] } | null;
-    return row?.titles?.[0] ?? null;
+    const row = data as unknown as { titles: TitleRow } | null;
+    return row?.titles ?? null;
   } catch {
     return null;
   }
@@ -593,8 +593,8 @@ export async function getEquippedTitlesMap(userIds: string[]): Promise<Record<st
       .select('user_id, titles!inner(id, code, name, color, glow, animation, created_from)')
       .eq('equipped', true)
       .in('user_id', userIds);
-    for (const r of (data ?? []) as unknown as { user_id: string; titles: TitleRow[] }[]) {
-      if (r.titles?.[0]) map[r.user_id] = r.titles[0];
+    for (const r of (data ?? []) as unknown as { user_id: string; titles: TitleRow }[]) {
+      if (r.titles?.id) map[r.user_id] = r.titles;
     }
   } catch {
     /* bỏ qua */
