@@ -1,0 +1,324 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Dancing+Script:wght@500;700&display=swap");
+@import "tailwindcss";
+
+/* Dark mode theo class .dark trên <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* =========================================================
+   6 BỘ GIAO DIỆN KHÁCH / ĐỌC TRUYỆN — ĐỘC BẢN TOÀN TẬP
+   ========================================================= */
+
+/* 1. THƯ CÁC TU TIÊN (thu-cac) — Tàng Kinh Các Tiên Môn Cổ Thư */
+:root,
+[data-template="thu-cac"] {
+  --brand: #b45309;
+  --brand-strong: #92400e;
+  --brand-soft: #fef3c7;
+  --page-bg: #faf7f2;
+  --card-bg: #ffffff;
+  --ink: #1c1917;
+  --muted: #78716c;
+  --border: #e7dfd5;
+  --card-radius: 14px;
+  --font-display: "Cinzel", "Playfair Display", "Noto Serif", Georgia, serif;
+}
+.dark,
+.dark[data-template="thu-cac"] {
+  --brand: #f59e0b;
+  --brand-strong: #fbbf24;
+  --brand-soft: #382006;
+  --page-bg: #14110f;
+  --card-bg: #1f1a16;
+  --ink: #f5f2ec;
+  --muted: #a89e92;
+  --border: #332a22;
+}
+
+/* 2. TRUYENC HIỆN ĐẠI (truyenc) — App Webtoon Next-Gen, Tím Neon & Hồng */
+[data-template="truyenc"] {
+  --brand: #7c3aed;
+  --brand-strong: #6d28d9;
+  --brand-soft: #f3e8ff;
+  --page-bg: #f8f9fc;
+  --card-bg: #ffffff;
+  --ink: #110e1f;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --card-radius: 24px;
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+.dark[data-template="truyenc"] {
+  --brand: #a855f7;
+  --brand-strong: #c084fc;
+  --brand-soft: #271447;
+  --page-bg: #0d0a17;
+  --card-bg: #171329;
+  --ink: #f8f7ff;
+  --muted: #94a3b8;
+  --border: #282142;
+}
+
+/* 3. DẠ HUYỀN ẢO (da-huyen-ao) — Dark Fantasy / Cyber Mystic Abyss */
+[data-template="da-huyen-ao"] {
+  --brand: #8b5cf6;
+  --brand-strong: #a78bfa;
+  --brand-soft: #211244;
+  --page-bg: #090714;
+  --card-bg: #130e26;
+  --ink: #f3f0ff;
+  --muted: #9d92be;
+  --border: rgba(139, 92, 246, 0.25);
+  --card-radius: 16px;
+  --font-display: "Cinzel", "Georgia", serif;
+}
+.dark[data-template="da-huyen-ao"] {
+  --brand: #a78bfa;
+  --brand-strong: #c4b5fd;
+  --brand-soft: #190c38;
+  --page-bg: #06040d;
+  --card-bg: #0f0b1f;
+  --ink: #f5f2ff;
+  --muted: #b3a8d6;
+  --border: rgba(139, 92, 246, 0.35);
+}
+
+/* 4. CỔ PHONG (co-phong) — Giang Hồ Thủy Mặc & Giấy Dó Triện Đỏ */
+[data-template="co-phong"] {
+  --brand: #b91c1c;
+  --brand-strong: #991b1b;
+  --brand-soft: #fee2e2;
+  --page-bg: #f5efe1;
+  --card-bg: #fdfbf7;
+  --ink: #2b1f13;
+  --muted: #786653;
+  --border: #ded3bc;
+  --card-radius: 6px;
+  --font-display: "Noto Serif", "Georgia", serif;
+}
+.dark[data-template="co-phong"] {
+  --brand: #ef4444;
+  --brand-strong: #f87171;
+  --brand-soft: #3b1111;
+  --page-bg: #18120c;
+  --card-bg: #241c14;
+  --ink: #f4ecdf;
+  --muted: #a39380;
+  --border: #3d3023;
+}
+
+/* 5. TỐI GIẢN (toi-gian) — Swiss Modernist / Pure Minimal Editorial */
+[data-template="toi-gian"] {
+  --brand: #09090b;
+  --brand-strong: #18181b;
+  --brand-soft: #f4f4f5;
+  --page-bg: #ffffff;
+  --card-bg: #ffffff;
+  --ink: #09090b;
+  --muted: #71717a;
+  --border: #e4e4e7;
+  --card-radius: 4px;
+  --font-display: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.dark[data-template="toi-gian"] {
+  --brand: #f4f4f5;
+  --brand-strong: #fafafa;
+  --brand-soft: #18181b;
+  --page-bg: #09090b;
+  --card-bg: #09090b;
+  --ink: #fafafa;
+  --muted: #a1a1aa;
+  --border: #27272a;
+}
+
+/* 6. TINH HÀ (tinh-ha) — Cinematic Starlight & Editorial Luxury */
+[data-template="tinh-ha"] {
+  --brand: #d97706;
+  --brand-strong: #b45309;
+  --brand-soft: #fef3c7;
+  --page-bg: #fffdfa;
+  --card-bg: #ffffff;
+  --ink: #1c1917;
+  --muted: #6b7280;
+  --border: #ebdcb9;
+  --card-radius: 16px;
+  --font-display: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+}
+.dark[data-template="tinh-ha"] {
+  --brand: #fbbf24;
+  --brand-strong: #f59e0b;
+  --brand-soft: #3a280c;
+  --page-bg: #090d16;
+  --card-bg: #111827;
+  --ink: #f3efe6;
+  --muted: #94a3b8;
+  --border: rgba(251, 191, 36, 0.15);
+}
+
+/* ================= Global Base & Fonts ================= */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-display), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--page-bg);
+  color: var(--ink);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Nội dung chương truyện */
+.chapter-content p {
+  margin-bottom: 1.15em;
+  line-height: 1.95;
+  text-align: justify;
+}
+
+/* Scrollbar tinh tế */
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.35);
+  border-radius: 8px;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background: rgba(160, 150, 140, 0.4);
+}
+
+/* Clamp text */
+.clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Ẩn scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ================= Animations & Badges ================= */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fadeUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(139, 92, 246, 0.55);
+  }
+}
+.glow-abyss {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+/* Triện đỏ cổ phong */
+.seal-stamp {
+  position: relative;
+  border: 1.5px solid #b91c1c;
+  color: #b91c1c;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(185, 28, 28, 0.06);
+}
+.dark .seal-stamp {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* Danh hiệu nhấp nháy */
+.user-title {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  padding: 0.1rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.25);
+}
+@keyframes title-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.title-blink {
+  animation: title-blink 1.3s ease-in-out infinite;
+}
+@keyframes title-shine {
+  to { background-position: 200% center; }
+}
+.title-shine {
+  background: linear-gradient(110deg, #b8860b 20%, #fffbe6 40%, #b8860b 60%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  animation: title-shine 2.5s linear infinite;
+}
+@keyframes title-neon {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+.title-neon {
+  --neon: #fff;
+  text-shadow: 0 0 3px #fff, 0 0 10px var(--neon), 0 0 22px var(--neon);
+  animation: title-neon 3s linear infinite;
+}
+
+/* tinh-ha lift */
+.tinh-ha-lift {
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+.tinh-ha-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.22);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
