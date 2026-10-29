@@ -17,7 +17,7 @@ export default function ToastHost() {
   }, []);
 
   return (
-    <div className="pointer-events-none fixed bottom-24 left-1/2 z-[60] flex w-full max-w-sm -translate-x-1/2 flex-col items-center gap-2 px-4">
+    <div className="pointer-events-none fixed bottom-36 left-1/2 z-[60] flex w-full max-w-sm -translate-x-1/2 flex-col items-center gap-2 px-4">
       {toasts.map((t) => (
         <div
           key={t.id}

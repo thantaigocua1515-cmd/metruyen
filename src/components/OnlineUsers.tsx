@@ -86,7 +86,7 @@ function OnlineUsersButton() {
           setOpen(true);
         }}
         title="Xem ai đang online"
-        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-amber-600/95 px-3 py-2 text-sm font-bold text-white shadow-lg backdrop-blur transition hover:bg-amber-500 active:scale-95"
+        className="fixed bottom-32 right-4 z-40 flex items-center gap-2 rounded-full bg-amber-600/95 px-3 py-2 text-sm font-bold text-white shadow-lg backdrop-blur transition hover:bg-amber-500 active:scale-95"
       >
         <span className="relative flex h-3 w-3">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>

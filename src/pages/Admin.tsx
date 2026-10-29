@@ -41,13 +41,13 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 const card =
-  'rounded-xl border border-amber-900/15 bg-white p-4 shadow-sm dark:border-amber-100/10 dark:bg-stone-900';
+  'rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900';
 const inputCls =
-  'w-full rounded-xl border border-amber-900/20 bg-white px-3 py-1.5 text-sm outline-none focus:border-amber-500 dark:border-amber-100/15 dark:bg-stone-800 dark:text-stone-100';
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';
 const btnPrimary =
-  'rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-amber-600 dark:hover:bg-amber-500';
+  'rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40';
 const btnGhost =
-  'rounded-full border border-amber-900/20 px-4 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-amber-100/15 dark:text-amber-300 dark:hover:bg-stone-800';
+  'rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800';
 
 /* ---------------- Tổng quan ---------------- */
 function OverviewTab() {
@@ -89,8 +89,8 @@ function OverviewTab() {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {cells.map(([label, value]) => (
         <div key={label} className={`${card} text-center`}>
-          <p className="text-2xl font-bold text-amber-800 dark:text-amber-300">{value}</p>
-          <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{label}</p>
+          <p className="text-2xl font-bold text-indigo-800 dark:text-indigo-300">{value}</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{label}</p>
         </div>
       ))}
     </div>
@@ -150,17 +150,17 @@ function UserRowEditor({ row, onChanged }: { row: UserRow; onChanged: () => void
   return (
     <div className={`${card} space-y-2`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="truncate font-bold text-stone-900 dark:text-stone-100">{row.username}</p>
+        <p className="truncate font-bold text-slate-900 dark:text-slate-100">{row.username}</p>
         <select
           value={role}
           onChange={(e) => setRole(e.target.value)}
-          className="rounded-full border border-amber-900/20 bg-white px-2 py-1 text-xs dark:border-amber-100/15 dark:bg-stone-800 dark:text-stone-100"
+          className="rounded-full border border-indigo-900/20 bg-white px-2 py-1 text-xs dark:border-indigo-100/15 dark:bg-slate-800 dark:text-slate-100"
         >
           <option value="user">user</option>
           <option value="admin">admin 👑</option>
         </select>
       </div>
-      <p className="text-xs text-stone-500 dark:text-stone-400">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
         ⏳ {(row.reading_seconds / 3600).toFixed(1)} giờ · 💎 {row.spirit_stones} linh thạch
       </p>
       <div className="flex gap-2">
@@ -212,7 +212,7 @@ function UsersTab() {
       {rows.map((r) => (
         <UserRowEditor key={r.id} row={r} onChanged={() => void load()} />
       ))}
-      {rows.length === 0 && <p className="italic text-stone-500">Chưa có người dùng nào.</p>}
+      {rows.length === 0 && <p className="italic text-slate-500">Chưa có người dùng nào.</p>}
     </div>
   );
 }
@@ -300,7 +300,7 @@ function SourcesTab() {
   return (
     <div className="space-y-3">
       <div className={`${card} space-y-2`}>
-        <p className="font-bold text-stone-900 dark:text-stone-100">
+        <p className="font-bold text-slate-900 dark:text-slate-100">
           {editingId ? 'Sửa nguồn API' : 'Thêm nguồn API mới'}
         </p>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên nguồn (vd: TruyenOK 2)" className={inputCls} />
@@ -332,10 +332,10 @@ function SourcesTab() {
       {sources.map((s) => (
         <div key={s.id} className={card}>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-bold text-stone-900 dark:text-stone-100">
+            <p className="font-bold text-slate-900 dark:text-slate-100">
               {s.is_active ? '🟢' : '⚪'} {s.name}
             </p>
-            <span className="text-xs text-stone-400">({s.id})</span>
+            <span className="text-xs text-slate-400">({s.id})</span>
             <div className="ml-auto flex flex-wrap gap-1">
               <button onClick={() => void check(s)} disabled={checking === s.id} className={btnGhost}>
                 {checking === s.id ? '...' : '🔍 Kiểm tra'}
@@ -361,8 +361,8 @@ function SourcesTab() {
               </button>
             </div>
           </div>
-          <p className="mt-1 break-all text-xs text-stone-500 dark:text-stone-400">{s.openapi_url}</p>
-          {s.base_url && <p className="text-xs text-stone-500 dark:text-stone-400">base: {s.base_url}</p>}
+          <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">{s.openapi_url}</p>
+          {s.base_url && <p className="text-xs text-slate-500 dark:text-slate-400">base: {s.base_url}</p>}
           {results[s.id] && <p className="mt-1 text-xs">{results[s.id]}</p>}
         </div>
       ))}
@@ -476,10 +476,10 @@ function NovelThumbRow({
       <img
         src={current || novel.coverUrl || ''}
         alt={novel.title}
-        className="h-24 w-16 shrink-0 rounded-lg object-cover bg-stone-200 dark:bg-stone-800"
+        className="h-24 w-16 shrink-0 rounded-lg object-cover bg-slate-200 dark:bg-slate-800"
       />
       <div className="min-w-0 flex-1 space-y-2">
-        <p className="truncate text-sm font-bold text-stone-900 dark:text-stone-100">{novel.title}</p>
+        <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{novel.title}</p>
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
@@ -494,7 +494,7 @@ function NovelThumbRow({
             {busy ? '...' : '✨ Tạo bằng AI'}
           </button>
           {lastSource && (
-            <span className="self-center text-xs text-stone-500 dark:text-stone-400">
+            <span className="self-center text-xs text-slate-500 dark:text-slate-400">
               Đã tạo bằng {lastSource}
             </span>
           )}
@@ -560,15 +560,15 @@ function CloudflareConfigCard() {
 
   return (
     <div className={card}>
-      <p className="font-bold text-stone-900 dark:text-stone-100">
+      <p className="font-bold text-slate-900 dark:text-slate-100">
         ☁️ Cloudflare Workers AI{' '}
-        <span className="text-xs font-normal text-stone-500 dark:text-stone-400">
+        <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
           (dự phòng miễn phí — tự dùng khi Gemini lỗi/hết quota)
         </span>
       </p>
-      <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
         Hướng dẫn lấy Worker URL + Secret: xem file{' '}
-        <code className="rounded bg-stone-100 px-1 dark:bg-stone-800">
+        <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">
           cloudflare-worker/HUONG-DAN.md
         </code>{' '}
         trong repo.
@@ -587,7 +587,7 @@ function CloudflareConfigCard() {
           type="password"
           className={inputCls}
         />
-        <label className="flex items-center gap-2 text-sm text-stone-700 dark:text-stone-300">
+        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
           Bật nguồn Cloudflare
         </label>
@@ -599,7 +599,7 @@ function CloudflareConfigCard() {
             {busy ? '...' : 'Kiểm tra kết nối'}
           </button>
         </div>
-        {msg && <p className="text-xs text-stone-600 dark:text-stone-400">{msg}</p>}
+        {msg && <p className="text-xs text-slate-600 dark:text-slate-400">{msg}</p>}
       </div>
     </div>
   );
@@ -677,7 +677,7 @@ function ThumbnailsTab() {
           ))}
         </select>
       </div>
-      {loading && <p className="text-sm text-stone-500">Đang tải danh sách truyện...</p>}
+      {loading && <p className="text-sm text-slate-500">Đang tải danh sách truyện...</p>}
       <div className="grid gap-3 lg:grid-cols-2">
         {novels.map((n) => (
           <NovelThumbRow
@@ -786,7 +786,7 @@ function ItemsTab() {
     <div className="space-y-3">
       <div className={`${card} grid gap-4 md:grid-cols-2`}>
         <div className="space-y-2">
-          <p className="font-bold text-stone-900 dark:text-stone-100">Tải vật phẩm mới</p>
+          <p className="font-bold text-slate-900 dark:text-slate-100">Tải vật phẩm mới</p>
           <select value={type} onChange={(e) => setType(e.target.value as 'frame' | 'treasure')} className={inputCls}>
             <option value="frame">🖼️ Khung avatar</option>
             <option value="treasure">⚔️ Pháp bảo</option>
@@ -799,7 +799,7 @@ function ItemsTab() {
             inputMode="numeric"
             className={inputCls}
           />
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-amber-700/40 px-4 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-300 dark:hover:bg-stone-800">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-dashed border-indigo-700/40 px-4 py-1.5 text-sm font-semibold text-indigo-800 hover:bg-indigo-50 dark:border-indigo-400/40 dark:text-indigo-300 dark:hover:bg-slate-800">
             📁 {file ? 'Đổi ảnh khác' : 'Chọn ảnh'}
             <input
               type="file"
@@ -809,7 +809,7 @@ function ItemsTab() {
             />
           </label>
           {file && (
-            <p className="text-xs text-stone-500 dark:text-stone-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Đã chọn: <span className="font-semibold">{file.name}</span> (
               {Math.round(file.size / 1024)} KB)
             </p>
@@ -820,9 +820,9 @@ function ItemsTab() {
         </div>
 
         <div className="space-y-2">
-          <p className="font-bold text-stone-900 dark:text-stone-100">Xem trước trực tiếp</p>
+          <p className="font-bold text-slate-900 dark:text-slate-100">Xem trước trực tiếp</p>
           <div className="relative mx-auto" style={{ width: 170, height: 170 }}>
-            <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-600 font-display text-5xl text-white">
+            <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-orange-600 font-display text-5xl text-white">
               M
             </div>
             {previewUrl && (
@@ -838,15 +838,15 @@ function ItemsTab() {
               />
             )}
           </div>
-          <label className="block text-xs text-stone-500">
+          <label className="block text-xs text-slate-500">
             Kích thước: {scale.toFixed(2)}x
             <input type="range" min={0.5} max={2.5} step={0.05} value={scale} onChange={(e) => setScale(parseFloat(e.target.value))} className="w-full" />
           </label>
-          <label className="block text-xs text-stone-500">
+          <label className="block text-xs text-slate-500">
             Ngang: {ox}px
             <input type="range" min={-100} max={100} step={1} value={ox} onChange={(e) => setOx(parseInt(e.target.value, 10))} className="w-full" />
           </label>
-          <label className="block text-xs text-stone-500">
+          <label className="block text-xs text-slate-500">
             Dọc: {oy}px
             <input type="range" min={-100} max={100} step={1} value={oy} onChange={(e) => setOy(parseInt(e.target.value, 10))} className="w-full" />
           </label>
@@ -859,11 +859,11 @@ function ItemsTab() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {items.map((it) => (
           <div key={it.id} className={card}>
-            <div className="flex aspect-square items-center justify-center rounded-lg bg-stone-100 p-2 dark:bg-stone-800">
+            <div className="flex aspect-square items-center justify-center rounded-lg bg-slate-100 p-2 dark:bg-slate-800">
               <img src={it.image_url} alt={it.name} className="max-h-full max-w-full object-contain" loading="lazy" />
             </div>
             <p className="mt-2 truncate text-sm font-bold">{it.name}</p>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-slate-500">
               {it.type === 'frame' ? 'Khung' : 'Pháp bảo'} · 💎 {it.price}
             </p>
             <button
@@ -943,10 +943,10 @@ function AnnounceTab() {
   return (
     <div className="space-y-4">
       <div className={card}>
-        <h3 className="mb-1 font-bold text-stone-900 dark:text-stone-100">
+        <h3 className="mb-1 font-bold text-slate-900 dark:text-slate-100">
           📢 Ban "Thông báo thiên đạo"
         </h3>
-        <p className="mb-3 text-sm text-stone-500 dark:text-stone-400">
+        <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
           Mọi tu sĩ đang online sẽ thấy popup ngay lập tức. Dùng để troll bạn bè cũng được 😏
         </p>
         <textarea
@@ -958,7 +958,7 @@ function AnnounceTab() {
           className={inputCls}
         />
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-xs text-stone-400">{message.length}/500</span>
+          <span className="text-xs text-slate-400">{message.length}/500</span>
           <button onClick={send} disabled={sending || !message.trim()} className={btnPrimary}>
             {sending ? 'Đang ban...' : '📜 Ban thông báo'}
           </button>
@@ -966,29 +966,29 @@ function AnnounceTab() {
       </div>
 
       <div className={card}>
-        <h3 className="mb-2 font-bold text-stone-900 dark:text-stone-100">
+        <h3 className="mb-2 font-bold text-slate-900 dark:text-slate-100">
           🕐 Lịch sử đã ban
         </h3>
         {history.length === 0 ? (
-          <p className="text-sm text-stone-500 dark:text-stone-400">Chưa có thông báo nào.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Chưa có thông báo nào.</p>
         ) : (
           <ul className="space-y-2">
             {history.map((h) => (
               <li
                 key={h.id}
-                className="flex items-start justify-between gap-2 rounded-xl bg-stone-50 p-3 dark:bg-stone-800"
+                className="flex items-start justify-between gap-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800"
               >
                 <div className="min-w-0">
-                  <p className="whitespace-pre-wrap text-sm text-stone-800 dark:text-stone-200">
+                  <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">
                     {h.message}
                   </p>
-                  <p className="mt-1 text-xs text-stone-400">
+                  <p className="mt-1 text-xs text-slate-400">
                     {new Date(h.created_at).toLocaleString('vi-VN')}
                   </p>
                 </div>
                 <button
                   onClick={() => remove(h.id)}
-                  className="shrink-0 rounded-full px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-stone-700"
+                  className="shrink-0 rounded-full px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-slate-700"
                 >
                   🗑️
                 </button>
@@ -1047,7 +1047,7 @@ function DefaultsTab() {
 
   return (
     <div className={`${card} max-w-xl space-y-3`}>
-      <p className="font-bold text-stone-900 dark:text-stone-100">
+      <p className="font-bold text-slate-900 dark:text-slate-100">
         🌱 Thông số mặc định khi có người tạo nhân vật mới
       </p>
       <label className="block text-sm">
@@ -1111,11 +1111,11 @@ function SystemTab() {
 
   return (
     <div className={`${card} max-w-xl space-y-3`}>
-      <p className="font-bold text-stone-900 dark:text-stone-100">🖥️ Trạng thái hệ thống</p>
-      <p className="break-all text-sm text-stone-600 dark:text-stone-300">
-        Supabase URL: <code className="rounded bg-stone-100 px-1 dark:bg-stone-800">{getSupabaseUrl()}</code>
+      <p className="font-bold text-slate-900 dark:text-slate-100">🖥️ Trạng thái hệ thống</p>
+      <p className="break-all text-sm text-slate-600 dark:text-slate-300">
+        Supabase URL: <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">{getSupabaseUrl()}</code>
       </p>
-      <p className="text-xs text-stone-500 dark:text-stone-400">
+      <p className="text-xs text-slate-500 dark:text-slate-400">
         Anon key được nạp từ biến môi trường <code>VITE_SUPABASE_ANON_KEY</code> (public-by-design,
         không hiển thị ở đây).
       </p>
@@ -1151,8 +1151,8 @@ function ThemeTab() {
   return (
     <div className="space-y-3">
       <div className={card}>
-        <p className="font-bold text-stone-900 dark:text-stone-100">🎨 Template giao diện</p>
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        <p className="font-bold text-slate-900 dark:text-slate-100">🎨 Template giao diện</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Đổi là áp dụng ngay cho toàn bộ website (lưu ở bảng{' '}
           <code>site_settings</code>, realtime tới mọi máy đang mở).
         </p>
@@ -1211,8 +1211,8 @@ function ThemeTab() {
                   </span>
                 )}
               </div>
-              <p className="mt-1.5 font-bold text-stone-900 dark:text-stone-100">{t.name}</p>
-              <p className="text-xs text-stone-500 dark:text-stone-400">{t.desc}</p>
+              <p className="mt-1.5 font-bold text-slate-900 dark:text-slate-100">{t.name}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t.desc}</p>
               <button
                 onClick={() => void apply(t.id)}
                 disabled={busy || active}
@@ -1478,11 +1478,11 @@ function SyncTab() {
 
   const statusBadge = (s: string) => {
     const cls: Record<string, string> = {
-      pending: 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200',
+      pending: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
       running: 'animate-pulse bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
       done: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
       error: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-      cancelled: 'bg-stone-200 text-stone-500 dark:bg-stone-700 dark:text-stone-400',
+      cancelled: 'bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400',
     };
     const label =
       { pending: 'Chờ', running: 'Đang chạy', done: 'Xong', error: 'Lỗi', cancelled: 'Đã hủy' }[
@@ -1498,7 +1498,7 @@ function SyncTab() {
   return (
     <div className="space-y-4">
       <div className={`${card} flex flex-wrap items-center gap-2`}>
-        <label className="text-sm font-semibold text-stone-700 dark:text-stone-300">
+        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
           Nguồn API:
         </label>
         <select
@@ -1537,16 +1537,16 @@ function SyncTab() {
       </div>
 
       {summary && (
-        <p className="rounded-xl border border-amber-900/15 bg-amber-50 px-4 py-2 text-sm text-stone-700 dark:border-amber-100/10 dark:bg-stone-800 dark:text-stone-200">
+        <p className="rounded-xl border border-indigo-900/15 bg-indigo-50 px-4 py-2 text-sm text-slate-700 dark:border-indigo-100/10 dark:bg-slate-800 dark:text-slate-200">
           {summary}
         </p>
       )}
 
       <div className={card}>
-        <h3 className="font-bold text-stone-900 dark:text-stone-100">
+        <h3 className="font-bold text-slate-900 dark:text-slate-100">
           📚 Truyện đã đồng bộ ({novels.length})
         </h3>
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Bấm "Đồng bộ chương" để tải nội dung từng chương về database — tự bỏ qua chương đã
           có, chương lỗi sẽ được bỏ qua và tiếp tục. Truyện dài 1000+ chương có thể mất vài
           phút: dùng nút "▶ Nền" để chạy trên server, tắt tab vẫn xong.
@@ -1561,10 +1561,10 @@ function SyncTab() {
             return (
               <div
                 key={n.id}
-                className="rounded-xl border border-amber-900/10 p-3 dark:border-amber-100/10"
+                className="rounded-xl border border-indigo-900/10 p-3 dark:border-indigo-100/10"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="min-w-0 flex-1 truncate font-semibold text-stone-900 dark:text-stone-100">
+                  <p className="min-w-0 flex-1 truncate font-semibold text-slate-900 dark:text-slate-100">
                     {n.title}
                   </p>
                   {running ? (
@@ -1591,10 +1591,10 @@ function SyncTab() {
                     </>
                   )}
                 </div>
-                <div className="mt-2 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-700">
+                <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                     <div
-                      className="h-full rounded-full bg-amber-600 transition-all dark:bg-amber-500"
+                      className="h-full rounded-full bg-indigo-600 transition-all dark:bg-indigo-500"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -1602,14 +1602,14 @@ function SyncTab() {
                     {running && progress[n.id] ? progress[n.id] : `đã sync ${done}/${total} chương`}
                   </span>
                 </div>
-                <p className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
+                <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
                   Lần cuối: {fmtDate(n.last_synced_at)}
                 </p>
               </div>
             );
           })}
           {novels.length === 0 && (
-            <p className="py-6 text-center text-sm italic text-stone-500 dark:text-stone-400">
+            <p className="py-6 text-center text-sm italic text-slate-500 dark:text-slate-400">
               Chưa có truyện nào trong database. Bấm "⬇ Đồng bộ danh sách truyện" để bắt đầu.
             </p>
           )}
@@ -1617,10 +1617,10 @@ function SyncTab() {
       </div>
 
       <div className={card}>
-        <h3 className="font-bold text-stone-900 dark:text-stone-100">
+        <h3 className="font-bold text-slate-900 dark:text-slate-100">
           ⚙️ Tiến trình nền ({jobs.length})
         </h3>
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Job chạy trên server (Edge Function) — tắt tab trình duyệt vẫn tiếp tục. Tiến trình cập
           nhật tự động theo thời gian thực.
         </p>
@@ -1631,15 +1631,15 @@ function SyncTab() {
             return (
               <div
                 key={j.id}
-                className="rounded-xl border border-amber-900/10 p-3 dark:border-amber-100/10"
+                className="rounded-xl border border-indigo-900/10 p-3 dark:border-indigo-100/10"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="min-w-0 flex-1 truncate font-semibold text-stone-900 dark:text-stone-100">
+                  <p className="min-w-0 flex-1 truncate font-semibold text-slate-900 dark:text-slate-100">
                     {jobTitle(j)}
                   </p>
                   {statusBadge(j.status)}
                   {stalled && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
                       ⏳ Đứng quá 10 phút
                     </span>
                   )}
@@ -1654,8 +1654,8 @@ function SyncTab() {
                     </button>
                   )}
                 </div>
-                <div className="mt-2 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-700">
+                <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                     <div
                       className="h-full rounded-full bg-blue-600 transition-all dark:bg-blue-500"
                       style={{ width: `${pct}%` }}
@@ -1666,7 +1666,7 @@ function SyncTab() {
                     {j.skipped > 0 ? ` · bỏ qua ${j.skipped}` : ''}
                   </span>
                 </div>
-                <p className="mt-1 text-[11px] text-stone-400 dark:text-stone-500">
+                <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
                   Cập nhật: {timeAgo(j.heartbeat_at ?? j.updated_at)}
                   {j.error ? ` · ❌ ${j.error}` : ''}
                 </p>
@@ -1674,7 +1674,7 @@ function SyncTab() {
             );
           })}
           {jobs.length === 0 && (
-            <p className="py-4 text-center text-sm italic text-stone-500 dark:text-stone-400">
+            <p className="py-4 text-center text-sm italic text-slate-500 dark:text-slate-400">
               Chưa có job nền nào. Bấm "▶ Chạy nền" ở trên để bắt đầu.
             </p>
           )}
@@ -1795,8 +1795,8 @@ function GeminiTab() {
   return (
     <div className="space-y-4">
       <div className={card}>
-        <p className="font-bold text-stone-900 dark:text-stone-100">➕ Thêm Gemini API key</p>
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        <p className="font-bold text-slate-900 dark:text-slate-100">➕ Thêm Gemini API key</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Lấy key miễn phí tại Google AI Studio (aistudio.google.com). Key được kiểm tra kết nối
           trước khi lưu — key lỗi sẽ không lưu vào database.
         </p>
@@ -1822,29 +1822,29 @@ function GeminiTab() {
       </div>
 
       <div className={card}>
-        <p className="font-bold text-stone-900 dark:text-stone-100">
+        <p className="font-bold text-slate-900 dark:text-slate-100">
           🔑 Danh sách key ({keys.filter((k) => k.is_active).length} đang bật / {keys.length})
         </p>
         <div className="mt-3 space-y-2">
           {keys.map((k) => (
             <div
               key={k.id}
-              className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-900/10 bg-amber-50/50 px-3 py-2 text-sm dark:border-amber-100/10 dark:bg-stone-800/60"
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-900/10 bg-indigo-50/50 px-3 py-2 text-sm dark:border-indigo-100/10 dark:bg-slate-800/60"
             >
               <span className="font-bold">{k.label}</span>
-              <code className="rounded bg-stone-200/70 px-1.5 py-0.5 font-mono text-xs dark:bg-stone-700">
+              <code className="rounded bg-slate-200/70 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-700">
                 {maskKey(k.api_key)}
               </code>
               <span
                 className={`rounded-full px-2 py-0.5 text-xs ${
                   k.is_active
                     ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                    : 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300'
+                    : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
                 }`}
               >
                 {k.is_active ? 'đang bật' : 'đang tắt'}
               </span>
-              <span className="text-xs text-stone-500 dark:text-stone-400">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {k.last_test_ok === null
                   ? 'chưa test'
                   : k.last_test_ok
@@ -1870,12 +1870,12 @@ function GeminiTab() {
             </div>
           ))}
           {keys.length === 0 && (
-            <p className="py-4 text-center text-sm italic text-stone-500 dark:text-stone-400">
+            <p className="py-4 text-center text-sm italic text-slate-500 dark:text-slate-400">
               Chưa có key nào. Thêm key ở trên để dùng chức năng dịch.
             </p>
           )}
         </div>
-        <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
           ℹ️ Key lưu trong database, chỉ admin đọc được. Trình duyệt gọi thẳng API Gemini khi dịch;
           key lỗi/hết quota sẽ tự xoay sang key khác còn bật.
         </p>
@@ -2085,8 +2085,8 @@ function ImportTab() {
   return (
     <div className="space-y-4">
       <div className={card}>
-        <p className="font-bold text-stone-900 dark:text-stone-100">📖 Bước 1 — Tạo truyện</p>
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        <p className="font-bold text-slate-900 dark:text-slate-100">📖 Bước 1 — Tạo truyện</p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Chỉ nhập nội dung bạn có quyền sử dụng (truyện tự sáng tác, bản dịch của bạn, hoặc tác
           phẩm miễn phí/không bản quyền).
         </p>
@@ -2122,7 +2122,7 @@ function ImportTab() {
       </div>
 
       <div className={card}>
-        <p className="font-bold text-stone-900 dark:text-stone-100">📝 Bước 2 — Nhập chương</p>
+        <p className="font-bold text-slate-900 dark:text-slate-100">📝 Bước 2 — Nhập chương</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <select
             className={`${inputCls} max-w-xs`}
@@ -2136,7 +2136,7 @@ function ImportTab() {
               </option>
             ))}
           </select>
-          <span className="text-xs text-stone-500 dark:text-stone-400">
+          <span className="text-xs text-slate-500 dark:text-slate-400">
             {parsed.length > 0
               ? `Đã nhận diện ${parsed.length} chương: ${parsed
                   .slice(0, 6)
@@ -2145,7 +2145,7 @@ function ImportTab() {
               : 'Dán nhiều chương theo format bên dưới'}
           </span>
         </div>
-        <pre className="mt-2 overflow-x-auto rounded-xl bg-stone-100 p-3 text-xs text-stone-600 dark:bg-stone-800 dark:text-stone-300">
+        <pre className="mt-2 overflow-x-auto rounded-xl bg-slate-100 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           {CHAPTER_FORMAT_HINT}
         </pre>
         <textarea
@@ -2171,27 +2171,27 @@ function ImportTab() {
           </button>
         </div>
         {transProgress && (
-          <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">{transProgress}</p>
+          <p className="mt-2 text-sm text-indigo-700 dark:text-indigo-300">{transProgress}</p>
         )}
         {msg && <p className="mt-2 text-sm">{msg}</p>}
-        <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
           💡 Dịch xong nội dung sẽ hiện lại trong ô trên để bạn kiểm tra/sửa trước khi lưu. Nút
           dịch chống bấm đúp; mỗi lần dịch nên kiểm tra key còn quota trong tab 🤖 Gemini.
         </p>
       </div>
 
       <div className={card}>
-        <p className="font-bold text-stone-900 dark:text-stone-100">
+        <p className="font-bold text-slate-900 dark:text-slate-100">
           📚 Truyện đã nhập tay ({novels.length})
         </p>
         <div className="mt-3 space-y-2">
           {novels.map((n) => (
             <div
               key={n.id}
-              className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-900/10 bg-amber-50/50 px-3 py-2 text-sm dark:border-amber-100/10 dark:bg-stone-800/60"
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-900/10 bg-indigo-50/50 px-3 py-2 text-sm dark:border-indigo-100/10 dark:bg-slate-800/60"
             >
               <span className="font-bold">{n.title}</span>
-              <span className="text-xs text-stone-500 dark:text-stone-400">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {n.synced_chapters} chương đã lưu
               </span>
               <span className="ml-auto">
@@ -2202,7 +2202,7 @@ function ImportTab() {
             </div>
           ))}
           {novels.length === 0 && (
-            <p className="py-4 text-center text-sm italic text-stone-500 dark:text-stone-400">
+            <p className="py-4 text-center text-sm italic text-slate-500 dark:text-slate-400">
               Chưa có truyện nào. Tạo truyện ở bước 1.
             </p>
           )}
@@ -2219,36 +2219,82 @@ export default function Admin() {
 
   if (!isAdmin) {
     return (
-      <p className="py-16 text-center text-lg text-stone-500 dark:text-stone-400">
+      <p className="py-16 text-center text-lg text-slate-500 dark:text-slate-400">
         ⛔ Khu vực chỉ dành cho quản trị viên.
       </p>
     );
   }
 
+  const current = TABS.find((t) => t.id === tab);
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <h1 className="font-display text-2xl font-bold text-amber-950 dark:text-amber-100">
-        ⚙️ Quản Trị {profile && <span className="text-base font-normal">· {profile.username}</span>}
-      </h1>
+    <div className="mx-auto w-full max-w-[1440px] px-3 py-5 sm:px-5">
+      <div className="lg:flex lg:items-start lg:gap-6">
+        {/* Sidebar — desktop */}
+        <aside className="sticky top-5 hidden w-64 shrink-0 lg:block">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center gap-3 px-1 pb-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-lg text-white shadow-sm">
+                ⚙️
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
+                  Quản trị Mê Truyện
+                </p>
+                <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                  {profile?.username ?? ''}
+                </p>
+              </div>
+            </div>
+            <nav className="space-y-0.5 border-t border-slate-100 pt-3 dark:border-slate-800">
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
+                    tab === t.id
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </aside>
 
-      <div className="mt-4 flex gap-1 overflow-x-auto border-b border-amber-900/15 pb-1 dark:border-amber-100/10">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`whitespace-nowrap rounded-t-lg px-4 py-2 text-sm font-semibold ${
-              tab === t.id
-                ? 'bg-amber-700 text-white dark:bg-amber-600'
-                : 'text-stone-500 hover:bg-amber-100/60 dark:text-stone-400 dark:hover:bg-stone-800'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+        {/* Nội dung */}
+        <div className="min-w-0 flex-1">
+          {/* Header mobile + tiêu đề tab */}
+          <div className="mb-4">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              {current?.label ?? '⚙️ Quản Trị'}
+            </h1>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+              Bảng điều khiển quản trị · {profile?.username ?? ''}
+            </p>
+          </div>
 
-      <div className="mt-4">
-        {tab === 'overview' && <OverviewTab />}
+          {/* Thanh tab cuộn ngang — mobile/tablet */}
+          <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 lg:hidden">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                  tab === t.id
+                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div>
+            {tab === 'overview' && <OverviewTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'sources' && <SourcesTab />}
         {tab === 'sync' && <SyncTab />}
@@ -2262,6 +2308,8 @@ export default function Admin() {
         {tab === 'theme' && <ThemeTab />}
         {tab === 'announce' && <AnnounceTab />}
         {tab === 'system' && <SystemTab />}
+          </div>
+        </div>
       </div>
     </div>
   );
