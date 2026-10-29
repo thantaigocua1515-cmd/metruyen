@@ -8,13 +8,13 @@ import {
 import { getGlossary, applyGlossary, bumpUsage, addGlossaryTerm } from '../../lib/glossary';
 
 const card =
-  'rounded-xl border border-amber-900/15 bg-white p-4 shadow-sm dark:border-amber-100/10 dark:bg-stone-900';
+  'rounded-xl border border-indigo-900/15 bg-white p-4 shadow-sm dark:border-indigo-100/10 dark:bg-slate-900';
 const inputCls =
-  'w-full rounded-xl border border-amber-900/20 bg-white px-3 py-1.5 text-sm outline-none focus:border-amber-500 dark:border-amber-100/15 dark:bg-stone-800 dark:text-stone-100';
+  'w-full rounded-xl border border-indigo-900/20 bg-white px-3 py-1.5 text-sm outline-none focus:border-indigo-500 dark:border-indigo-100/15 dark:bg-slate-800 dark:text-slate-100';
 const btnPrimary =
-  'rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-amber-600 dark:hover:bg-amber-500';
+  'rounded-full bg-indigo-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-indigo-600 dark:hover:bg-indigo-500';
 const btnGhost =
-  'rounded-full border border-amber-900/20 px-4 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-amber-100/15 dark:text-amber-300 dark:hover:bg-stone-800';
+  'rounded-full border border-indigo-900/20 px-4 py-1.5 text-sm font-semibold text-indigo-800 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-indigo-100/15 dark:text-indigo-300 dark:hover:bg-slate-800';
 
 interface NovelOpt {
   id: string;
@@ -243,14 +243,14 @@ export default function ChapterManager() {
   return (
     <div className="space-y-4">
       <div className={card}>
-        <h3 className="font-bold text-stone-900 dark:text-stone-100">📝 Sửa từng chương</h3>
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        <h3 className="font-bold text-slate-900 dark:text-slate-100">📝 Sửa từng chương</h3>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Chọn truyện → chọn chương → sửa tiêu đề/nội dung, dịch bằng Gemini (chọn phong cách)
           hoặc từ điển tự học, rồi lưu.
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-stone-600 dark:text-stone-300">
+            <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
               Truyện ({novels.length})
             </span>
             <select value={novelId} onChange={(e) => setNovelId(e.target.value)} className={inputCls}>
@@ -263,7 +263,7 @@ export default function ChapterManager() {
             </select>
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-stone-600 dark:text-stone-300">
+            <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
               Nhảy tới chương số
             </span>
             <div className="flex gap-2">
@@ -286,7 +286,7 @@ export default function ChapterManager() {
       <div className="grid gap-4 lg:grid-cols-5">
         {/* Danh sách chương */}
         <div className={`${card} lg:col-span-2`}>
-          <h4 className="font-semibold text-stone-900 dark:text-stone-100">
+          <h4 className="font-semibold text-slate-900 dark:text-slate-100">
             Mục lục — {novelTitle} ({chapters.length} chương)
           </h4>
           <div className="mt-2 max-h-96 space-y-1 overflow-y-auto">
@@ -294,21 +294,21 @@ export default function ChapterManager() {
               <button
                 key={c.chapter_number}
                 onClick={() => void openChapter(c.chapter_number)}
-                className={`block w-full truncate rounded-lg px-3 py-1.5 text-left text-sm hover:bg-amber-50 dark:hover:bg-stone-800 ${
+                className={`block w-full truncate rounded-lg px-3 py-1.5 text-left text-sm hover:bg-indigo-50 dark:hover:bg-slate-800 ${
                   selNum === c.chapter_number
-                    ? 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200'
-                    : 'text-stone-700 dark:text-stone-300'
+                    ? 'bg-indigo-100 font-semibold text-indigo-900 dark:bg-indigo-900/40 dark:text-indigo-200'
+                    : 'text-slate-700 dark:text-slate-300'
                 }`}
               >
-                <span className="mr-2 inline-block w-12 text-stone-400">{c.chapter_number}</span>
+                <span className="mr-2 inline-block w-12 text-slate-400">{c.chapter_number}</span>
                 {c.title?.trim() ? c.title : `Chương ${c.chapter_number}`}
               </button>
             ))}
             {chapters.length === 0 && (
-              <p className="py-4 text-center text-sm text-stone-400">Chưa có chương nào.</p>
+              <p className="py-4 text-center text-sm text-slate-400">Chưa có chương nào.</p>
             )}
           </div>
-          <div className="mt-2 flex items-center justify-between text-xs text-stone-500 dark:text-stone-400">
+          <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
@@ -332,22 +332,22 @@ export default function ChapterManager() {
         {/* Editor */}
         <div className={`${card} lg:col-span-3`}>
           {selNum === null ? (
-            <p className="py-10 text-center text-sm text-stone-400">
+            <p className="py-10 text-center text-sm text-slate-400">
               Chọn một chương ở danh sách bên trái để sửa.
             </p>
           ) : (
             <div className="space-y-3">
-              <h4 className="font-semibold text-stone-900 dark:text-stone-100">
+              <h4 className="font-semibold text-slate-900 dark:text-slate-100">
                 Chương {selNum}
               </h4>
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-stone-600 dark:text-stone-300">
+                <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
                   Tiêu đề
                 </span>
                 <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
               </label>
               <label className="block">
-                <span className="mb-1 block text-xs font-semibold text-stone-600 dark:text-stone-300">
+                <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
                   Nội dung ({content.length.toLocaleString()} ký tự)
                 </span>
                 <textarea
@@ -359,7 +359,7 @@ export default function ChapterManager() {
               </label>
               <div className="grid gap-2 md:grid-cols-2">
                 <label className="block">
-                  <span className="mb-1 block text-xs font-semibold text-stone-600 dark:text-stone-300">
+                  <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
                     Engine dịch
                   </span>
                   <select
@@ -373,7 +373,7 @@ export default function ChapterManager() {
                 </label>
                 {engine === 'gemini' && (
                   <label className="block">
-                    <span className="mb-1 block text-xs font-semibold text-stone-600 dark:text-stone-300">
+                    <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
                       Phong cách dịch
                     </span>
                     <select value={styleId} onChange={(e) => setStyleId(e.target.value)} className={inputCls}>
@@ -396,14 +396,14 @@ export default function ChapterManager() {
                 </button>
               </div>
               {engine === 'glossary' && (
-                <p className="text-xs italic text-stone-500 dark:text-stone-400">
+                <p className="text-xs italic text-slate-500 dark:text-slate-400">
                   Engine từ điển chỉ thay thế theo từ đã lưu — bản nháp, nên biên tập lại hoặc
                   chạy tiếp Gemini cho mượt.
                 </p>
               )}
               {/* Helper lưu từ vào từ điển */}
-              <div className="rounded-xl border border-dashed border-amber-900/25 p-3 dark:border-amber-100/20">
-                <p className="text-xs font-semibold text-stone-700 dark:text-stone-200">
+              <div className="rounded-xl border border-dashed border-indigo-900/25 p-3 dark:border-indigo-100/20">
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                   ➕ Lưu từ vào từ điển
                 </p>
                 <div className="mt-2 grid gap-2 md:grid-cols-4">
@@ -438,7 +438,7 @@ export default function ChapterManager() {
       </div>
 
       {msg && (
-        <p className="rounded-xl border border-amber-900/15 bg-amber-50 px-4 py-2 text-sm text-stone-700 dark:border-amber-100/10 dark:bg-stone-800 dark:text-stone-200">
+        <p className="rounded-xl border border-indigo-900/15 bg-indigo-50 px-4 py-2 text-sm text-slate-700 dark:border-indigo-100/10 dark:bg-slate-800 dark:text-slate-200">
           {msg}
         </p>
       )}

@@ -10,13 +10,13 @@ import {
 import { getTranslationStyles, type TranslationStyleRow } from '../../lib/translate';
 
 const card =
-  'rounded-xl border border-amber-900/15 bg-white p-4 shadow-sm dark:border-amber-100/10 dark:bg-stone-900';
+  'rounded-xl border border-indigo-900/15 bg-white p-4 shadow-sm dark:border-indigo-100/10 dark:bg-slate-900';
 const inputCls =
-  'w-full rounded-xl border border-amber-900/20 bg-white px-3 py-1.5 text-sm outline-none focus:border-amber-500 dark:border-amber-100/15 dark:bg-stone-800 dark:text-stone-100';
+  'w-full rounded-xl border border-indigo-900/20 bg-white px-3 py-1.5 text-sm outline-none focus:border-indigo-500 dark:border-indigo-100/15 dark:bg-slate-800 dark:text-slate-100';
 const btnPrimary =
-  'rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-amber-600 dark:hover:bg-amber-500';
+  'rounded-full bg-indigo-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-indigo-600 dark:hover:bg-indigo-500';
 const btnGhost =
-  'rounded-full border border-amber-900/20 px-4 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-amber-100/15 dark:text-amber-300 dark:hover:bg-stone-800';
+  'rounded-full border border-indigo-900/20 px-4 py-1.5 text-sm font-semibold text-indigo-800 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-indigo-100/15 dark:text-indigo-300 dark:hover:bg-slate-800';
 
 interface NovelOpt {
   id: string;
@@ -183,10 +183,10 @@ export default function GlossaryManager() {
     <div className="space-y-4">
       {/* ---------- Từ điển ---------- */}
       <div className={card}>
-        <h3 className="font-bold text-stone-900 dark:text-stone-100">
+        <h3 className="font-bold text-slate-900 dark:text-slate-100">
           📖 Từ điển dịch tự học ({terms.length} từ)
         </h3>
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Từ điển thay thế trực tiếp, không cần Gemini — từ nào dùng nhiều sẽ được liệt kê trước.
           Đây là bản nháp: sau khi áp dụng nên biên tập lại hoặc chạy tiếp Gemini cho mượt.
         </p>
@@ -224,15 +224,15 @@ export default function GlossaryManager() {
             className={inputCls}
           />
         </div>
-        {msg && <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">{msg}</p>}
+        {msg && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{msg}</p>}
         <div className="mt-3 max-h-80 space-y-1 overflow-y-auto">
           {terms.map((t) => (
             <div
               key={t.id}
-              className="flex flex-wrap items-center gap-2 rounded-lg px-3 py-1.5 text-sm hover:bg-amber-50 dark:hover:bg-stone-800"
+              className="flex flex-wrap items-center gap-2 rounded-lg px-3 py-1.5 text-sm hover:bg-indigo-50 dark:hover:bg-slate-800"
             >
-              <span className="font-semibold text-stone-900 dark:text-stone-100">{t.source_term}</span>
-              <span className="text-stone-400">→</span>
+              <span className="font-semibold text-slate-900 dark:text-slate-100">{t.source_term}</span>
+              <span className="text-slate-400">→</span>
               {editingId === t.id ? (
                 <input
                   value={editingTgt}
@@ -241,12 +241,12 @@ export default function GlossaryManager() {
                   autoFocus
                 />
               ) : (
-                <span className="text-stone-700 dark:text-stone-300">{t.target_term}</span>
+                <span className="text-slate-700 dark:text-slate-300">{t.target_term}</span>
               )}
-              <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500 dark:bg-stone-700 dark:text-stone-300">
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-300">
                 {t.novel_id ? novelTitleOf(t.novel_id) : 'toàn cục'}
               </span>
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
                 dùng {t.usage_count} lần
               </span>
               <span className="flex-1" />
@@ -278,17 +278,17 @@ export default function GlossaryManager() {
             </div>
           ))}
           {terms.length === 0 && (
-            <p className="py-4 text-center text-sm text-stone-400">Từ điển đang trống.</p>
+            <p className="py-4 text-center text-sm text-slate-400">Từ điển đang trống.</p>
           )}
         </div>
       </div>
 
       {/* ---------- Phong cách dịch ---------- */}
       <div className={card}>
-        <h3 className="font-bold text-stone-900 dark:text-stone-100">
+        <h3 className="font-bold text-slate-900 dark:text-slate-100">
           🎨 Phong cách dịch Gemini ({styles.length})
         </h3>
-        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Dùng trong tab 📝 Chương khi chọn engine Gemini. Chỉ có 1 phong cách mặc định.
         </p>
         <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -322,17 +322,17 @@ export default function GlossaryManager() {
             </button>
           )}
         </div>
-        {styleMsg && <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">{styleMsg}</p>}
+        {styleMsg && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{styleMsg}</p>}
         <div className="mt-3 space-y-2">
           {styles.map((s) => (
             <div
               key={s.id}
-              className="rounded-xl border border-amber-900/10 p-3 dark:border-amber-100/10"
+              className="rounded-xl border border-indigo-900/10 p-3 dark:border-indigo-100/10"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold text-stone-900 dark:text-stone-100">{s.name}</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">{s.name}</p>
                 {s.is_default && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
                     mặc định
                   </span>
                 )}
@@ -349,7 +349,7 @@ export default function GlossaryManager() {
                   Xóa
                 </button>
               </div>
-              <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{s.prompt}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{s.prompt}</p>
             </div>
           ))}
         </div>
