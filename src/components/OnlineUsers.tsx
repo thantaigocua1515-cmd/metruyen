@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useChrome } from '../context/ChromeContext';
 import {
   createPresenceListener,
   getGuestId,
@@ -47,6 +48,7 @@ function readingLine(p: PresenceState): string {
 /** Nút nhỏ hiện số người online + popup danh sách. */
 function OnlineUsersButton() {
   const { user } = useAuth();
+  const { hidden: chromeHidden } = useChrome();
   const [open, setOpen] = useState(false);
   const [users, setUsers] = useState<PresenceState[]>([]);
   const [selected, setSelected] = useState<PresenceState | null>(null);
@@ -77,6 +79,9 @@ function OnlineUsersButton() {
   }, [users]);
 
   const myId = user ? user.id : getGuestId();
+
+  // Chế độ toàn màn hình khi đọc truyện: ẩn nút online (giữ nguyên popup nếu đang mở)
+  if (chromeHidden && !open) return null;
 
   return (
     <>

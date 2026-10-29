@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useChrome } from '../context/ChromeContext';
 
 const TABS = [
   { to: '/', label: 'Trang chủ', icon: '🏠', match: (p: string) => p === '/' },
@@ -20,6 +21,7 @@ const MAX_SCALE = 1.45;
  */
 export default function BottomTabBar() {
   const { user } = useAuth();
+  const { hidden: chromeHidden } = useChrome();
   const { pathname } = useLocation();
   const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const centersRef = useRef<number[]>([]);
@@ -53,6 +55,9 @@ export default function BottomTabBar() {
   };
 
   const onLeave = () => setScales(TABS.map(() => 1));
+
+  // Chế độ toàn màn hình khi đọc truyện: ẩn cả dock lẫn spacer
+  if (chromeHidden) return null;
 
   return (
     <>

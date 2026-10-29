@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { TemplateProvider } from './context/TemplateContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ChromeProvider } from './context/ChromeContext';
 import { isSupabaseConfigured } from './lib/supabase';
 import Navbar from './components/Navbar';
 import BottomTabBar from './components/BottomTabBar';
@@ -73,6 +74,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <TemplateProvider>
+        <ChromeProvider>
         <AuthProvider>
           <HashRouter>
             <div
@@ -143,6 +145,7 @@ export default function App() {
           </div>
         </HashRouter>
         </AuthProvider>
+        </ChromeProvider>
       </TemplateProvider>
     </ThemeProvider>
   );

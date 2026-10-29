@@ -4,6 +4,7 @@ import type { ApiSourceRow, ChapterMeta, NovelSummary } from '../lib/novelApi';
 import { getSyncedChapter } from '../lib/library';
 import { getSupabase } from '../lib/supabase';
 import { bumpStat } from '../lib/gamification';
+import { useChrome } from '../context/ChromeContext';
 
 interface Block {
   num: number;
@@ -48,6 +49,41 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
   const loadingRef = useRef(false);
   loadingRef.current = loading;
   const startedRef = useRef(false);
+
+  /* --- Chạm vào nội dung để ẩn/hiện navbar + dock (đọc toàn màn hình) --- */
+  const { toggle: toggleChrome, setHidden: setChromeHidden } = useChrome();
+  const tapRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const [showHint, setShowHint] = useState(true);
+
+  // rời khỏi màn hình đọc → luôn hiện lại giao diện
+  useEffect(() => {
+    return () => setChromeHidden(false);
+  }, [setChromeHidden]);
+
+  useEffect(() => {
+    const id = setTimeout(() => setShowHint(false), 5000);
+    return () => clearTimeout(id);
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    tapRef.current = { x: e.clientX, y: e.clientY, t: Date.now() };
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const start = tapRef.current;
+    tapRef.current = null;
+    if (!start) return;
+    const dx = Math.abs(e.clientX - start.x);
+    const dy = Math.abs(e.clientY - start.y);
+    const dt = Date.now() - start.t;
+    // chỉ tính là "chạm" khi gần như không di chuyển và thả tay nhanh (không phải cuộn/chọn chữ)
+    if (dx > 12 || dy > 12 || dt > 350) return;
+    // chạm vào nút/link/ô nhập thì không chuyển chế độ
+    const el = e.target as HTMLElement | null;
+    if (el?.closest('a, button, input, select, textarea, [role="button"]')) return;
+    setShowHint(false);
+    toggleChrome();
+  };
 
   const saveProgress = useCallback(
     async (chapterNum: number) => {
@@ -162,7 +198,18 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
   }, [nextNum, loadChapter]);
 
   return (
-    <article className="mx-auto max-w-3xl px-4 py-6">
+    <article
+      className="relative mx-auto max-w-3xl px-4 py-6"
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+    >
+      {showHint && (
+        <div className="pointer-events-none sticky top-3 z-10 mb-3 flex justify-center">
+          <span className="rounded-full bg-stone-900/80 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur dark:bg-white/85 dark:text-stone-900">
+            👆 Chạm vào màn hình để ẩn giao diện · đọc toàn màn hình
+          </span>
+        </div>
+      )}
       <h1 className="font-display text-center text-2xl font-bold text-amber-950 dark:text-amber-100">
         {novel.title}
       </h1>

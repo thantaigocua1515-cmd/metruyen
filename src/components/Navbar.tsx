@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useChrome } from '../context/ChromeContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTemplate } from '../context/TemplateContext';
 import AvatarWithFrame from './AvatarWithFrame';
@@ -10,6 +11,7 @@ import type { EquippedItem } from '../lib/equipped';
 
 export default function Navbar() {
   const { user, profile, isAdmin, signOut } = useAuth();
+  const { hidden: chromeHidden } = useChrome();
   const { theme, toggle } = useTheme();
   const { template } = useTemplate();
   const navigate = useNavigate();
@@ -108,6 +110,9 @@ export default function Navbar() {
       {theme === 'dark' ? '☀️' : '🌙'}
     </button>
   );
+
+  /* ---------- Chế độ toàn màn hình khi đọc truyện ---------- */
+  if (chromeHidden) return null;
 
   /* ---------- Variant TruyenC: header kiểu app hiện đại ---------- */
   if (template === 'truyenc') {
