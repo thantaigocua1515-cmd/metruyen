@@ -91,11 +91,16 @@ function OnlineUsersButton() {
           setOpen(true);
         }}
         title="Xem ai đang online"
-        className="fixed bottom-32 right-4 z-40 flex items-center gap-2 rounded-full bg-amber-600/95 px-3 py-2 text-sm font-bold text-white shadow-lg backdrop-blur transition hover:bg-amber-500 active:scale-95"
+        aria-label="Xem danh sách đạo hữu đang trực tuyến"
+        className="fixed bottom-32 right-4 z-40 flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-bold text-white shadow-lg backdrop-blur transition hover:opacity-90 active:scale-95"
+        style={{
+          background: 'var(--brand)',
+          borderColor: 'var(--border)',
+        }}
       >
-        <span className="relative flex h-3 w-3">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
-          <span className="relative inline-flex h-3 w-3 rounded-full bg-green-400"></span>
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75"></span>
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
         </span>
         <span>{users.length}</span>
       </button>

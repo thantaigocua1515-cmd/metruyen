@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import ReaderView from '../components/ReaderView';
 import { updatePresenceReading } from '../lib/presence';
 import { bumpStat, checkRankUp } from '../lib/gamification';
+import { ArrowLeftIcon } from '../components/icons';
 
 /** +1 linh thạch mỗi 5 phút đọc (300 giây). */
 const STONES_PER_5MIN = 1;
@@ -25,7 +26,6 @@ export default function Reader() {
 
   const chapterNum = Math.max(1, parseInt(chapter ?? '1', 10) || 1);
 
-  // Báo cho mọi người biết mình đang đọc truyện gì, chương mấy
   useEffect(() => {
     if (detail && novelId) {
       void updatePresenceReading({
@@ -42,20 +42,19 @@ export default function Reader() {
       if (!sourceId || !novelId) return;
       try {
         if (sourceId === 'manual') {
-          // Truyện nhập tay: đọc trực tiếp từ DB
           const row = await getSyncedNovel(`${sourceId}:${novelId}`);
           if (!row) throw new Error('Không tìm thấy truyện.');
           const syncedList = await getSyncedNovelChapterList(row.id).catch(() => []);
           const src: ApiSourceRow = {
             id: 'manual',
-            name: '📝 Nhập tay',
+            name: 'Nhập tay',
             openapi_url: '',
             base_url: null,
             is_active: true,
           };
           const d: NovelDetailType = {
             sourceId: 'manual',
-            sourceName: '📝 Nhập tay',
+            sourceName: 'Nhập tay',
             id: row.api_id,
             title: row.title,
             author: row.author,
@@ -96,7 +95,6 @@ export default function Reader() {
     };
   }, [sourceId, novelId]);
 
-  // Tính giờ đọc: mỗi 60 giây (tab đang mở) cộng 60s + ghi session + linh thạch
   useEffect(() => {
     if (!user) return;
     let accSeconds = 0;
@@ -123,13 +121,12 @@ export default function Reader() {
           })
           .eq('id', user.id);
         await supabase.from('reading_sessions').insert({ user_id: user.id, seconds: 60 });
-        // Gamification: cộng chỉ số nhiệm vụ/thành tựu + kiểm tra tăng cấp tu vi
         void bumpStat(user.id, 'read_seconds', 60);
         if (earned > 0) void bumpStat(user.id, 'stones_earned', earned * STONES_PER_5MIN);
         void checkRankUp(user.id, oldSeconds, oldSeconds + 60);
         void refreshProfile();
       } catch {
-        /* lỗi mạng thì bỏ qua tick này */
+        /* ignore */
       }
     }, 60000);
     return () => window.clearInterval(timer);
@@ -137,9 +134,9 @@ export default function Reader() {
 
   if (error) {
     return (
-      <div className="py-16 text-center">
+      <div className="py-20 text-center">
         <p className="text-red-600 dark:text-red-400">{error}</p>
-        <Link to="/" className="mt-2 inline-block text-amber-700 underline dark:text-amber-300">
+        <Link to="/" className="mt-3 inline-block font-semibold underline" style={{ color: 'var(--brand)' }}>
           ← Về trang chủ
         </Link>
       </div>
@@ -148,21 +145,34 @@ export default function Reader() {
 
   if (!source || !detail) {
     return (
-      <p className="py-16 text-center text-stone-500 dark:text-stone-400">
-        📖 Đang mở chương {chapterNum}...
-      </p>
+      <div className="py-24 text-center" style={{ color: 'var(--muted)' }}>
+        <div
+          className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-2 border-current border-t-transparent"
+          style={{ color: 'var(--brand)' }}
+        />
+        <p className="text-sm font-medium">Đang khai mở chương {chapterNum}...</p>
+      </div>
     );
   }
 
   return (
-    <div className="bg-amber-50/50 dark:bg-stone-950">
-      <div className="mx-auto max-w-3xl px-4 pt-4">
+    <div style={{ background: 'var(--page-bg)' }}>
+      <div className="mx-auto flex max-w-3xl items-center justify-between px-4 pt-5">
         <Link
           to={`/novel/${sourceId}/${encodeURIComponent(detail.id)}`}
-          className="text-sm text-amber-800 hover:underline dark:text-amber-300"
+          className="inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-semibold transition hover:opacity-80"
+          style={{
+            borderColor: 'var(--border)',
+            background: 'var(--card-bg)',
+            color: 'var(--brand-strong)',
+          }}
         >
-          ← {detail.title}
+          <ArrowLeftIcon className="h-3.5 w-3.5" />
+          Mục lục: {detail.title}
         </Link>
+        <span className="text-xs" style={{ color: 'var(--muted)' }}>
+          Chương {chapterNum}
+        </span>
       </div>
       <ReaderView
         key={`${sourceId}:${detail.id}:${chapterNum}`}

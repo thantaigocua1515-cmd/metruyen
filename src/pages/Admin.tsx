@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
 import { getSupabase, getSupabaseUrl } from '../lib/supabase';
 import { fetchOpenApiInfo, fetchNovels } from '../lib/novelApi';
 import type { ApiSourceRow, NovelSummary } from '../lib/novelApi';
@@ -1186,60 +1185,147 @@ function ThemeTab() {
           return (
             <div
               key={t.id}
-              className={`${card} ${active ? 'ring-2' : ''}`}
-              style={active ? ({ ['--tw-ring-color' as string]: 'var(--brand)' } as CSSProperties) : undefined}
+              className={`${card} flex flex-col ${active ? 'ring-2 ring-indigo-600' : ''}`}
             >
-              {/* mock preview nhỏ */}
+              {/* mock preview kiến trúc riêng của từng template */}
               <div
-                className="overflow-hidden rounded-lg"
-                style={{ background: 'var(--page-bg)', border: '1px solid color-mix(in srgb, var(--ink) 12%, transparent)' }}
+                className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800"
+                style={{ background: t.swatches[2] }}
               >
                 <div
-                  className="flex items-center gap-1 px-2 py-1.5"
-                  style={{ background: t.swatches[2] }}
+                  className="flex items-center justify-between border-b px-2.5 py-1.5"
+                  style={{ borderColor: `${t.swatches[0]}22` }}
                 >
-                  <span className="text-xs">📖</span>
                   <span className="text-[11px] font-bold" style={{ color: t.swatches[0] }}>
-                    Mê Truyện
+                    {t.name}
+                  </span>
+                  <span
+                    className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase"
+                    style={{ background: `${t.swatches[0]}20`, color: t.swatches[0] }}
+                  >
+                    {t.id}
                   </span>
                 </div>
-                <div className="flex gap-1 p-2">
-                  {[0, 1].map((i) => (
+
+                {/* Wireframe đặc trưng từng kiến trúc */}
+                {t.id === 'thu-cac' && (
+                  <div className="grid grid-cols-3 gap-1.5 p-2.5">
                     <div
-                      key={i}
-                      className="h-14 flex-1 rounded"
-                      style={{
-                        background: `linear-gradient(135deg, ${t.swatches[0]}55, ${t.swatches[1]}88)`,
-                      }}
+                      className="col-span-2 h-14 rounded-md"
+                      style={{ background: `${t.swatches[0]}25`, borderLeft: `3px solid ${t.swatches[0]}` }}
                     />
-                  ))}
-                </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="h-6 rounded" style={{ background: `${t.swatches[1]}35` }} />
+                      <div className="h-7 rounded" style={{ background: `${t.swatches[0]}18` }} />
+                    </div>
+                  </div>
+                )}
+                {t.id === 'truyenc' && (
+                  <div className="grid grid-cols-3 gap-1.5 p-2.5">
+                    <div
+                      className="col-span-2 h-14 rounded-xl"
+                      style={{ background: `linear-gradient(135deg, ${t.swatches[0]}, ${t.swatches[1]})` }}
+                    />
+                    <div className="space-y-1">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="h-4 rounded" style={{ background: `${t.swatches[0]}22` }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {t.id === 'da-huyen-ao' && (
+                  <div className="space-y-1.5 p-2.5">
+                    <div
+                      className="h-5 rounded border"
+                      style={{ borderColor: `${t.swatches[1]}66`, background: `${t.swatches[0]}33` }}
+                    />
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[0, 1, 2].map((i) => (
+                        <div
+                          key={i}
+                          className="h-8 rounded border"
+                          style={{ borderColor: `${t.swatches[0]}55`, background: `${t.swatches[0]}22` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {t.id === 'co-phong' && (
+                  <div className="p-2.5">
+                    <div
+                      className="flex h-14 items-center justify-between border-2 px-2"
+                      style={{ borderColor: `${t.swatches[0]}55` }}
+                    >
+                      <div className="h-9 w-7 border" style={{ borderColor: t.swatches[0] }} />
+                      <div className="flex-1 px-2">
+                        <div className="h-2.5 w-3/4" style={{ background: t.swatches[0] }} />
+                        <div className="mt-1.5 h-2 w-1/2" style={{ background: `${t.swatches[1]}88` }} />
+                      </div>
+                      <span
+                        className="border px-1 py-0.5 text-[8px] font-bold"
+                        style={{ borderColor: t.swatches[0], color: t.swatches[0] }}
+                      >
+                        ẤN
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {t.id === 'toi-gian' && (
+                  <div className="grid grid-cols-3 border-t p-2.5 gap-0" style={{ borderColor: t.swatches[0] }}>
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className="h-14 border p-1"
+                        style={{ borderColor: t.swatches[0] }}
+                      >
+                        <div className="h-2 w-4" style={{ background: t.swatches[1] }} />
+                        <div className="mt-2 h-6 w-full" style={{ background: `${t.swatches[0]}15` }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {t.id === 'tinh-ha' && (
+                  <div className="space-y-1.5 p-2.5">
+                    <div
+                      className="h-8 rounded-md"
+                      style={{ background: `linear-gradient(90deg, ${t.swatches[2]}, ${t.swatches[0]}88)` }}
+                    />
+                    <div className="flex gap-1">
+                      {[0, 1, 2, 3].map((i) => (
+                        <div key={i} className="h-5 flex-1 rounded" style={{ background: `${t.swatches[0]}35` }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="mt-2 flex items-center gap-2">
+
+              <div className="mt-3 flex items-center gap-2">
                 {t.swatches.map((c, i) => (
                   <span
                     key={i}
-                    className="h-5 w-5 rounded-full border border-black/10"
+                    className="h-4 w-4 rounded-full border border-black/15"
                     style={{ background: c }}
                   />
                 ))}
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {t.architecture}
+                </span>
                 {active && (
-                  <span
-                    className="ml-auto rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
-                    style={{ background: 'var(--brand)' }}
-                  >
+                  <span className="ml-auto rounded-full bg-indigo-600 px-2.5 py-0.5 text-[11px] font-bold text-white">
                     Đang dùng
                   </span>
                 )}
               </div>
-              <p className="mt-1.5 font-bold text-slate-900 dark:text-slate-100">{t.name}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t.desc}</p>
+              <p className="mt-2 font-bold text-slate-900 dark:text-slate-100">{t.name}</p>
+              <p className="mt-0.5 flex-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                {t.desc}
+              </p>
               <button
                 onClick={() => void apply(t.id)}
                 disabled={busy || active}
-                className={`${btnPrimary} mt-2 w-full`}
+                className={`${btnPrimary} mt-3 w-full`}
               >
-                {busy ? 'Đang áp dụng...' : active ? '✓ Đang dùng' : 'Áp dụng'}
+                {busy ? 'Đang áp dụng...' : active ? '✓ Đang dùng' : 'Áp dụng giao diện này'}
               </button>
             </div>
           );

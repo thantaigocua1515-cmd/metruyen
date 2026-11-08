@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getSupabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useTemplate } from '../context/TemplateContext';
 import { syncStateStats } from '../lib/gamification';
+import { GemIcon, StoreIcon } from './icons';
 
 export interface CosmeticItem {
   id: string;
@@ -14,9 +17,9 @@ export interface CosmeticItem {
   offset_y: number;
 }
 
-/** Tàng Bảo Các — mua khung avatar / pháp bảo bằng linh thạch. */
 export default function Treasury() {
   const { user, profile, refreshProfile } = useAuth();
+  const { template } = useTemplate();
   const [items, setItems] = useState<CosmeticItem[]>([]);
   const [owned, setOwned] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -48,7 +51,9 @@ export default function Treasury() {
     if (!user || !profile) return;
     if (owned.has(item.id)) return;
     if (profile.spirit_stones < item.price) {
-      alert(`Không đủ linh thạch! Cần ${item.price}, bạn có ${profile.spirit_stones}. Hãy đọc truyện để kiếm thêm.`);
+      alert(
+        `Không đủ linh thạch! Cần ${item.price}, bạn có ${profile.spirit_stones}. Hãy đọc truyện để kiếm thêm.`,
+      );
       return;
     }
     if (!window.confirm(`Mua "${item.name}" với giá ${item.price} linh thạch?`)) return;
@@ -87,28 +92,58 @@ export default function Treasury() {
 
   if (!user) {
     return (
-      <p className="py-16 text-center text-stone-500 dark:text-stone-400">
-        Hãy <a href="#/auth" className="text-amber-700 underline dark:text-amber-300">đăng nhập</a> để
-        vào Tàng Bảo Các.
+      <p className="py-20 text-center" style={{ color: 'var(--muted)' }}>
+        Hãy{' '}
+        <Link to="/auth" className="font-bold underline" style={{ color: 'var(--brand)' }}>
+          đăng nhập
+        </Link>{' '}
+        để vào Tàng Bảo Các.
       </p>
     );
   }
 
+  const isSwiss = template === 'toi-gian';
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <h1 className="font-display text-center text-2xl font-bold text-amber-950 dark:text-amber-100">
-        🏯 Tàng Bảo Các
-      </h1>
-      <p className="mt-1 text-center text-sm text-stone-500 dark:text-stone-400">
-        💎 Linh thạch của bạn: <b className="text-amber-700 dark:text-amber-300">{profile?.spirit_stones ?? 0}</b>
-        {' '}· đọc 5 phút được +1 linh thạch
-      </p>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-5" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex items-center gap-3">
+          <span
+            className="flex h-11 w-11 items-center justify-center rounded-2xl"
+            style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+          >
+            <StoreIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <h1 className="font-display text-2xl font-bold sm:text-3xl" style={{ color: 'var(--ink)' }}>
+              Tàng Bảo Các
+            </h1>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              Đổi linh thạch lấy khung đại diện & pháp bảo hộ thân (5 phút đọc = +1 linh thạch)
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold"
+          style={{
+            borderColor: 'var(--border)',
+            background: 'var(--surface-alt)',
+            color: 'var(--brand)',
+          }}
+        >
+          <GemIcon className="h-4 w-4" />
+          {profile?.spirit_stones ?? 0} Linh thạch
+        </div>
+      </div>
 
       {loading ? (
-        <p className="py-10 text-center text-stone-500">Đang tải bảo vật...</p>
+        <p className="py-16 text-center" style={{ color: 'var(--muted)' }}>
+          Đang mở kho bảo vật...
+        </p>
       ) : items.length === 0 ? (
-        <p className="py-10 text-center italic text-stone-500 dark:text-stone-400">
-          Tàng Bảo Các đang trống — admin hãy thêm vật phẩm trong Quản trị → Vật phẩm.
+        <p className="py-16 text-center italic" style={{ color: 'var(--muted)' }}>
+          Tàng Bảo Các đang trống — Quản trị viên có thể thêm vật phẩm trong mục Quản trị → Vật phẩm.
         </p>
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -117,33 +152,62 @@ export default function Treasury() {
             return (
               <div
                 key={item.id}
-                className="overflow-hidden rounded-xl border border-amber-900/15 bg-white shadow-sm dark:border-amber-100/10 dark:bg-stone-900"
+                className={`flex flex-col overflow-hidden border bg-[var(--card-bg)] shadow-sm transition hover:-translate-y-1 hover:shadow-lg ${
+                  isSwiss ? '' : 'rounded-2xl'
+                }`}
+                style={{ borderColor: 'var(--border)' }}
               >
-                <div className="flex aspect-square items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 p-4 dark:from-stone-800 dark:to-stone-900">
+                <div
+                  className="flex aspect-square items-center justify-center p-6"
+                  style={{ background: 'var(--surface-alt)' }}
+                >
                   <img
                     src={item.image_url}
                     alt={item.name}
-                    className="max-h-full max-w-full object-contain"
+                    className="max-h-full max-w-full object-contain drop-shadow-md"
                     loading="lazy"
                   />
                 </div>
-                <div className="p-3">
-                  <p className="truncate text-sm font-bold text-stone-900 dark:text-stone-100">
-                    {item.type === 'frame' ? '🖼️' : '⚔️'} {item.name}
-                  </p>
-                  <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
-                    {item.type === 'frame' ? 'Khung avatar' : 'Pháp bảo'}
+                <div className="flex flex-1 flex-col p-4">
+                  <span
+                    className="w-fit rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase"
+                    style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+                  >
+                    {item.type === 'frame' ? 'Khung Avatar' : 'Pháp Bảo'}
+                  </span>
+                  <p className="font-display mt-2 truncate text-lg font-bold" style={{ color: 'var(--ink)' }}>
+                    {item.name}
                   </p>
                   <button
                     disabled={isOwned || buying === item.id}
                     onClick={() => void buy(item)}
-                    className={`mt-2 w-full rounded-full py-1.5 text-sm font-semibold ${
+                    className={`mt-auto inline-flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 pt-0 text-sm font-bold transition disabled:cursor-default ${
+                      isSwiss ? '' : 'rounded-full'
+                    }`}
+                    style={
                       isOwned
-                        ? 'bg-stone-200 text-stone-500 dark:bg-stone-700 dark:text-stone-400'
-                        : 'bg-amber-700 text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500'
-                    } disabled:cursor-default`}
+                        ? {
+                            marginTop: '0.75rem',
+                            background: 'var(--surface-alt)',
+                            color: 'var(--muted)',
+                          }
+                        : {
+                            marginTop: '0.75rem',
+                            background: 'var(--brand)',
+                            color: '#fff',
+                          }
+                    }
                   >
-                    {buying === item.id ? 'Đang mua...' : isOwned ? 'Đã sở hữu' : `💎 ${item.price} linh thạch`}
+                    {buying === item.id ? (
+                      'Đang giao dịch...'
+                    ) : isOwned ? (
+                      'Đã sở hữu'
+                    ) : (
+                      <>
+                        <GemIcon className="h-3.5 w-3.5" />
+                        {item.price} linh thạch
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

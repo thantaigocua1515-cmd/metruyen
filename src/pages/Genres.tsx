@@ -4,7 +4,6 @@ import { useNovels } from '../lib/useNovels';
 import { GENRES, filterByGenre } from '../lib/genres';
 import NovelCard from '../components/NovelCard';
 
-/** Trang thể loại: hàng pill + lưới truyện (lọc bằng heuristic keyword). */
 export default function Genres() {
   const { template } = useTemplate();
   const { novels, overrides, loading, error } = useNovels();
@@ -17,53 +16,58 @@ export default function Genres() {
     return m;
   }, [novels]);
 
-  const isTruyenc = template === 'truyenc';
-  const gridCls = isTruyenc
-    ? 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5'
-    : 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5 xl:grid-cols-6';
+  const isSwiss = template === 'toi-gian';
 
   return (
-    <div className="mx-auto max-w-7xl px-3 py-6 sm:px-4">
-      <h1
-        className="text-center text-2xl font-bold"
-        style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)' }}
-      >
-        🗂️ Thể Loại
-      </h1>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <div className="text-center">
+        <p className="text-xs font-bold tracking-[0.2em] uppercase" style={{ color: 'var(--brand)' }}>
+          Phân Loại Kinh Thư
+        </p>
+        <h1
+          className="font-display mt-1 text-3xl font-bold sm:text-4xl"
+          style={{ color: 'var(--ink)' }}
+        >
+          Thể Loại Tác Phẩm
+        </h1>
+      </div>
 
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+      <div className="no-scrollbar mt-6 flex flex-wrap justify-center gap-2 pb-2">
         {GENRES.map((g) => {
           const active = genre === g.id;
           return (
             <button
               key={g.id}
               onClick={() => setGenre(g.id)}
-              className="whitespace-nowrap rounded-full px-5 py-2 text-sm font-semibold transition"
+              className={`cursor-pointer border px-4 py-2 text-xs font-bold whitespace-nowrap transition sm:text-sm ${
+                isSwiss ? 'font-mono-tech uppercase' : 'rounded-full'
+              }`}
               style={
                 active
-                  ? { background: 'var(--brand)', color: '#fff' }
+                  ? {
+                      background: 'var(--brand)',
+                      color: '#fff',
+                      borderColor: 'var(--brand)',
+                    }
                   : {
                       background: 'var(--card-bg)',
-                      color: 'var(--muted)',
-                      border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)',
+                      color: 'var(--ink)',
+                      borderColor: 'var(--border)',
                     }
               }
             >
               {g.label}
               {novels.length > 0 && (
-                <span className="ml-1 opacity-70">({counts[g.id] ?? 0})</span>
+                <span className="ml-1.5 opacity-75">({counts[g.id] ?? 0})</span>
               )}
             </button>
           );
         })}
       </div>
-      <p className="mt-1 text-center text-xs italic" style={{ color: 'var(--muted)' }}>
-        * Thể loại do web tự đoán theo từ khóa (API chưa có trường thể loại).
-      </p>
 
       {loading && (
         <p className="py-16 text-center" style={{ color: 'var(--muted)' }}>
-          📖 Đang thỉnh kinh từ các nguồn...
+          Đang tải danh mục thể loại...
         </p>
       )}
       {error && (
@@ -75,11 +79,12 @@ export default function Genres() {
         </p>
       )}
 
-      <div className={`${gridCls} mt-4`}>
-        {filtered.map((n) => (
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {filtered.map((n, idx) => (
           <NovelCard
             key={`${n.sourceId}:${n.id}`}
             novel={n}
+            index={idx}
             coverOverride={overrides[`${n.sourceId}:${n.id}`]}
           />
         ))}

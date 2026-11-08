@@ -7,6 +7,8 @@ import type { EquippedItem } from '../lib/equipped';
 import AvatarWithFrame from '../components/AvatarWithFrame';
 import UserTitle from '../components/UserTitle';
 import { useAuth } from '../context/AuthContext';
+import { useTemplate } from '../context/TemplateContext';
+import { ArrowLeftIcon, ClockIcon, GemIcon, SparklesIcon } from '../components/icons';
 
 interface ProfileRow {
   id: string;
@@ -18,10 +20,10 @@ interface ProfileRow {
   created_at: string;
 }
 
-/** Trang cá nhân công khai của đạo hữu khác (xem từ BXH). */
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
   const { user } = useAuth();
+  const { template } = useTemplate();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [frame, setFrame] = useState<EquippedItem | null>(null);
   const [treasure, setTreasure] = useState<EquippedItem | null>(null);
@@ -61,13 +63,19 @@ export default function UserProfile() {
   }, [userId]);
 
   if (loading) {
-    return <p className="py-16 text-center text-stone-500 dark:text-stone-400">Đang mở hồ sơ...</p>;
+    return (
+      <p className="py-20 text-center" style={{ color: 'var(--muted)' }}>
+        Đang mở hồ sơ đạo hữu...
+      </p>
+    );
   }
   if (notFound || !profile) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-lg text-stone-500 dark:text-stone-400">Không tìm thấy đạo hữu này.</p>
-        <Link to="/leaderboard" className="mt-2 inline-block text-amber-700 underline dark:text-amber-300">
+      <div className="py-20 text-center">
+        <p className="text-lg" style={{ color: 'var(--muted)' }}>
+          Không tìm thấy đạo hữu này.
+        </p>
+        <Link to="/leaderboard" className="mt-2 inline-block font-semibold underline" style={{ color: 'var(--brand)' }}>
           ← Về bảng xếp hạng
         </Link>
       </div>
@@ -77,10 +85,25 @@ export default function UserProfile() {
   const rank = getRank(profile.reading_seconds / 3600);
   const isSelf = user?.id === profile.id;
   const joined = new Date(profile.created_at).toLocaleDateString('vi-VN');
+  const isSwiss = template === 'toi-gian';
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <div className="rounded-2xl border border-amber-900/15 bg-white p-6 text-center shadow-sm dark:border-amber-100/10 dark:bg-stone-900">
+    <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <div className="mb-4">
+        <Link
+          to="/leaderboard"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold transition hover:opacity-75"
+          style={{ color: 'var(--muted)' }}
+        >
+          <ArrowLeftIcon className="h-3.5 w-3.5" />
+          Về bảng xếp hạng
+        </Link>
+      </div>
+
+      <div
+        className={`border p-6 text-center shadow-sm sm:p-8 ${isSwiss ? '' : 'rounded-3xl'}`}
+        style={{ borderColor: 'var(--border)', background: 'var(--card-bg)' }}
+      >
         <div className="flex justify-center">
           <AvatarWithFrame
             src={profile.avatar_url}
@@ -90,58 +113,85 @@ export default function UserProfile() {
             treasure={treasure}
           />
         </div>
-        <h1 className="font-display mt-4 text-2xl font-bold text-amber-950 dark:text-amber-100">
+        <h1 className="font-display mt-4 text-2xl font-bold sm:text-3xl" style={{ color: 'var(--ink)' }}>
           {profile.username}
         </h1>
-        <div className="mt-1 flex justify-center">
+        <div className="mt-1.5 flex justify-center">
           <UserTitle userId={profile.id} />
         </div>
         {profile.role === 'admin' && (
-          <span className="mt-1 inline-block rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-            👑 Quản trị viên
+          <span
+            className="mt-2 inline-block rounded-full px-3 py-0.5 text-xs font-bold"
+            style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+          >
+            Quản trị viên
           </span>
         )}
-        <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">Gia nhập: {joined}</p>
+        <p className="mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+          Gia nhập: {joined}
+        </p>
 
-        <div className="mx-auto mt-4 max-w-sm">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-            ⚔️ {rank.name}
-            {rank.nextName && <span className="font-normal text-stone-500"> → {rank.nextName}</span>}
+        <div className="mx-auto mt-5 max-w-sm">
+          <p className="inline-flex items-center gap-1.5 text-sm font-bold" style={{ color: 'var(--brand)' }}>
+            <SparklesIcon className="h-4 w-4" />
+            {rank.name}
+            {rank.nextName && (
+              <span className="font-normal" style={{ color: 'var(--muted)' }}>
+                → {rank.nextName}
+              </span>
+            )}
           </p>
-          <div className="mt-1 h-2 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-700">
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500"
-              style={{ width: `${rank.progress}%` }}
+              className="h-full rounded-full"
+              style={{ width: `${rank.progress}%`, background: 'var(--brand)' }}
             />
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-2 text-center">
-          <div className="rounded-xl bg-amber-50 p-3 dark:bg-stone-800">
-            <p className="text-lg font-bold text-amber-800 dark:text-amber-300">
+        <div className="mt-6 grid grid-cols-2 gap-3 text-center">
+          <div
+            className={`border p-3.5 ${isSwiss ? '' : 'rounded-2xl'}`}
+            style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}
+          >
+            <p className="inline-flex items-center gap-1 text-lg font-bold" style={{ color: 'var(--brand)' }}>
+              <ClockIcon className="h-4 w-4" />
               {formatHours(profile.reading_seconds)}
             </p>
-            <p className="text-xs text-stone-500 dark:text-stone-400">⏳ Giờ đọc</p>
-          </div>
-          <div className="rounded-xl bg-amber-50 p-3 dark:bg-stone-800">
-            <p className="text-lg font-bold text-amber-800 dark:text-amber-300">
-              💎 {profile.spirit_stones}
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              Giờ đọc
             </p>
-            <p className="text-xs text-stone-500 dark:text-stone-400">Linh thạch</p>
+          </div>
+          <div
+            className={`border p-3.5 ${isSwiss ? '' : 'rounded-2xl'}`}
+            style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}
+          >
+            <p className="inline-flex items-center gap-1 text-lg font-bold" style={{ color: 'var(--brand)' }}>
+              <GemIcon className="h-4 w-4" />
+              {profile.spirit_stones}
+            </p>
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              Linh thạch
+            </p>
           </div>
         </div>
 
         {(frame || treasure) && (
-          <div className="mt-4 space-y-1 text-left">
-            <p className="text-sm font-bold text-stone-700 dark:text-stone-200">✨ Đang trang bị</p>
+          <div
+            className={`mt-5 border p-4 text-left ${isSwiss ? '' : 'rounded-2xl'}`}
+            style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}
+          >
+            <p className="text-xs font-bold tracking-wider uppercase" style={{ color: 'var(--muted)' }}>
+              Pháp bảo đang trang bị
+            </p>
             {frame && (
-              <p className="truncate text-sm text-stone-600 dark:text-stone-300">
-                🖼️ Khung: <span className="font-semibold">{frame.name || 'Khung avatar'}</span>
+              <p className="mt-1 truncate text-sm" style={{ color: 'var(--ink)' }}>
+                Khung viền: <strong>{frame.name || 'Khung avatar'}</strong>
               </p>
             )}
             {treasure && (
-              <p className="truncate text-sm text-stone-600 dark:text-stone-300">
-                ⚔️ Pháp bảo: <span className="font-semibold">{treasure.name || 'Pháp bảo'}</span>
+              <p className="mt-0.5 truncate text-sm" style={{ color: 'var(--ink)' }}>
+                Pháp bảo: <strong>{treasure.name || 'Pháp bảo'}</strong>
               </p>
             )}
           </div>
@@ -150,16 +200,12 @@ export default function UserProfile() {
         {isSelf && (
           <Link
             to="/profile"
-            className="mt-5 inline-block rounded-full bg-amber-700 px-5 py-1.5 text-sm font-semibold text-white hover:bg-amber-800 dark:bg-amber-600"
+            className="mt-6 inline-flex h-10 items-center rounded-full px-6 text-sm font-bold text-white"
+            style={{ background: 'var(--brand)' }}
           >
             Đây là bạn — tới trang cá nhân
           </Link>
         )}
-      </div>
-      <div className="mt-4 text-center">
-        <Link to="/leaderboard" className="text-sm text-amber-700 hover:underline dark:text-amber-300">
-          ← Về bảng xếp hạng
-        </Link>
       </div>
     </div>
   );

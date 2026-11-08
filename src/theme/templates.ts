@@ -11,6 +11,8 @@ export interface TemplateDef {
   name: string;
   /** Mô tả ngắn cho admin */
   desc: string;
+  /** Nhãn kiến trúc bố cục */
+  architecture: string;
   /** 3 màu đại diện hiện ở card chọn template */
   swatches: [string, string, string];
 }
@@ -19,38 +21,44 @@ export const TEMPLATES: TemplateDef[] = [
   {
     id: 'thu-cac',
     name: 'Thư Các Tu Tiên',
-    desc: 'Giao diện gốc: thư các cổ điển, tông hổ phách trầm ấm.',
-    swatches: ['#b45309', '#f59e0b', '#fafaf9'],
+    desc: 'Tàng Kinh Các học giả: bố cục Bento đối xứng, bìa nổi có gáy sách, chữ Cormorant Garamond & Crimson Pro.',
+    architecture: 'Scholarly Bento & Book Spine',
+    swatches: ['#b45309', '#f59e0b', '#faf7f0'],
   },
   {
     id: 'truyenc',
     name: 'TruyenC Hiện Đại',
-    desc: 'Trắng/tím hiện đại, bottom tab bar trên mobile, mục Truyện Hot.',
-    swatches: ['#7c3aed', '#a855f7', '#ffffff'],
+    desc: 'Super-App năng động: thanh điều hướng nổi, spotlight Bento + bảng xếp hạng Top 10 đi kèm.',
+    architecture: 'Super-App Portal & Top Chart',
+    swatches: ['#7c3aed', '#ec4899', '#f8f7ff'],
   },
   {
     id: 'da-huyen-ao',
     name: 'Dạ Huyền Ảo',
-    desc: 'Dark fantasy: nền đêm tím huyền ảo, chữ serif.',
-    swatches: ['#8b5cf6', '#2e1065', '#0d0a18'],
+    desc: 'Arcane RPG Codex: giao diện ma pháp bóng đêm, thẻ bài Tarot viền phát sáng và thanh trạng thái HUD.',
+    architecture: 'Arcane HUD & Tarot Cards',
+    swatches: ['#8b5cf6', '#22d3ee', '#070510'],
   },
   {
     id: 'co-phong',
     name: 'Cổ Phong',
-    desc: 'Giấy dó xưa: nền giấy vàng nhạt, đỏ son + vàng đồng, serif.',
-    swatches: ['#b91c1c', '#d4af37', '#f7f1e3'],
+    desc: 'Thư quyển giấy tuyên: cuộn trúc phương Đông, ấn chương chu sa đỏ son, chữ dọc nghệ thuật.',
+    architecture: 'Oriental Scroll & Vermilion Seal',
+    swatches: ['#b91c1c', '#d4af37', '#f6efe0'],
   },
   {
     id: 'toi-gian',
     name: 'Tối Giản',
-    desc: 'Minimal: xám đá trung tính, ít trang trí, tập trung nội dung.',
-    swatches: ['#334155', '#94a3b8', '#f8fafc'],
+    desc: 'Swiss Modernism 2.0: lưới chuẩn toán học 12 cột, đường kẻ 1px sắc nét, typography chữ lớn và nhãn monospace.',
+    architecture: 'Swiss 12-Col Grid & Index',
+    swatches: ['#0f172a', '#ea580c', '#ffffff'],
   },
   {
     id: 'tinh-ha',
     name: 'Tinh Hà',
-    desc: 'Thư các điện ảnh: hero cinematic, chữ serif sang trọng.',
-    swatches: ['#B45309', '#FFFBEB', '#0A0E17'],
+    desc: 'Thư các điện ảnh: màn ảnh rộng Widescreen 21:9, cuộn ngang Poster và danh sách Editorial sang trọng.',
+    architecture: 'Cinematic Widescreen & Editorial',
+    swatches: ['#d97706', '#fffbeb', '#070b14'],
   },
 ];
 

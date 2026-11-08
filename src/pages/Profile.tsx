@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getSupabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useTemplate } from '../context/TemplateContext';
 import { fetchEquippedItems } from '../lib/equipped';
 import type { EquippedItem } from '../lib/equipped';
 import { getRank, formatHours } from '../lib/tuvi';
@@ -9,17 +10,19 @@ import AvatarWithFrame from '../components/AvatarWithFrame';
 import UserTitle from '../components/UserTitle';
 import { QuestPanel, AchievementPanel, TitlePanel } from '../components/GamificationPanels';
 import { syncStateStats } from '../lib/gamification';
+import { BookmarkIcon, ClockIcon, GemIcon, SparklesIcon } from '../components/icons';
 
 type SubTab = 'quests' | 'achievements' | 'titles';
 
 const SUBTABS: { id: SubTab; label: string }[] = [
-  { id: 'quests', label: '🎯 Nhiệm vụ' },
-  { id: 'achievements', label: '🏅 Thành tựu' },
-  { id: 'titles', label: '👑 Danh hiệu' },
+  { id: 'quests', label: 'Nhiệm vụ tu luyện' },
+  { id: 'achievements', label: 'Thành tựu' },
+  { id: 'titles', label: 'Danh hiệu' },
 ];
 
 export default function Profile() {
   const { user, profile, refreshProfile } = useAuth();
+  const { template } = useTemplate();
   const [frame, setFrame] = useState<EquippedItem | null>(null);
   const [treasure, setTreasure] = useState<EquippedItem | null>(null);
   const [shelfCount, setShelfCount] = useState(0);
@@ -38,7 +41,6 @@ export default function Profile() {
       .select('novel_id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .then(({ count }) => setShelfCount(count ?? 0));
-    // Đồng bộ chỉ số thành tựu/nhiệm vụ từ trạng thái hiện tại
     void syncStateStats(user.id);
   }, [user, profile?.avatar_url]);
 
@@ -76,20 +78,27 @@ export default function Profile() {
 
   if (!user || !profile) {
     return (
-      <p className="py-16 text-center text-stone-500 dark:text-stone-400">
-        Hãy <Link to="/auth" className="text-amber-700 underline dark:text-amber-300">đăng nhập</Link> để
-        xem trang cá nhân.
+      <p className="py-20 text-center" style={{ color: 'var(--muted)' }}>
+        Hãy{' '}
+        <Link to="/auth" className="font-bold underline" style={{ color: 'var(--brand)' }}>
+          đăng nhập
+        </Link>{' '}
+        để xem trang cá nhân.
       </p>
     );
   }
 
   const rank = getRank(profile.reading_seconds / 3600);
+  const isSwiss = template === 'toi-gian';
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="rounded-2xl border border-amber-900/15 bg-white p-6 shadow-sm dark:border-amber-100/10 dark:bg-stone-900">
-        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-          <div className="flex flex-col items-center gap-2">
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <div
+        className={`border p-6 shadow-sm sm:p-8 ${isSwiss ? '' : 'rounded-3xl'}`}
+        style={{ borderColor: 'var(--border)', background: 'var(--card-bg)' }}
+      >
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+          <div className="flex flex-col items-center gap-2.5">
             <AvatarWithFrame
               src={profile.avatar_url}
               frame={frame}
@@ -108,77 +117,135 @@ export default function Profile() {
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="rounded-full border border-amber-700 px-4 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-300 dark:hover:bg-stone-800"
+              className={`cursor-pointer border px-4 py-1.5 text-xs font-semibold transition hover:opacity-80 ${
+                isSwiss ? '' : 'rounded-full'
+              }`}
+              style={{
+                borderColor: 'var(--border)',
+                background: 'var(--surface-alt)',
+                color: 'var(--ink)',
+              }}
             >
-              {uploading ? 'Đang tải...' : '📷 Đổi avatar'}
+              {uploading ? 'Đang tải...' : 'Đổi ảnh đại diện'}
             </button>
           </div>
 
           <div className="min-w-0 flex-1 text-center sm:text-left">
-            <h1 className="font-display text-2xl font-bold text-amber-950 dark:text-amber-100">
-              {profile.username}
-            </h1>
-            <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-              {profile.role === 'admin' ? '👑 Quản trị viên' : '📖 Đạo hữu'} · tham gia{' '}
-              {new Date(profile.created_at).toLocaleDateString('vi-VN')}
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+              <h1 className="font-display text-2xl font-bold sm:text-3xl" style={{ color: 'var(--ink)' }}>
+                {profile.username}
+              </h1>
+              <span
+                className="rounded-full px-3 py-0.5 text-xs font-bold"
+                style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+              >
+                {profile.role === 'admin' ? 'Quản trị viên' : 'Đạo hữu'}
+              </span>
+            </div>
+            <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+              Nhập môn ngày {new Date(profile.created_at).toLocaleDateString('vi-VN')}
             </p>
 
-            <div className="mt-4 rounded-xl bg-amber-50 p-4 dark:bg-stone-800">
+            {/* Realm Progress */}
+            <div
+              className={`mt-5 border p-4 ${isSwiss ? '' : 'rounded-2xl'}`}
+              style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}
+            >
               <div className="flex items-center justify-between">
-                <span className="font-display text-lg font-bold text-amber-800 dark:text-amber-300">
-                  ⚔️ {rank.name}
+                <span className="font-display flex items-center gap-1.5 text-lg font-bold" style={{ color: 'var(--brand)' }}>
+                  <SparklesIcon className="h-4 w-4" />
+                  Cảnh giới: {rank.name}
                 </span>
-                <span className="text-xs text-stone-500 dark:text-stone-400">
-                  {rank.nextName ? `→ ${rank.nextName}: ${Math.round(rank.progress)}%` : 'Đã đạt đỉnh!'}
+                <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+                  {rank.nextName ? `Đột phá ${rank.nextName}: ${Math.round(rank.progress)}%` : 'Cảnh giới tối cao'}
                 </span>
               </div>
-              <div className="mt-2 h-3 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-700">
+              <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 transition-all"
-                  style={{ width: `${rank.progress}%` }}
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${rank.progress}%`,
+                    background: 'linear-gradient(90deg, var(--brand), var(--accent, var(--brand-strong)))',
+                  }}
                 />
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl bg-stone-100 p-3 dark:bg-stone-800">
-                <p className="text-lg font-bold text-amber-800 dark:text-amber-300">
+            {/* Stats Bento */}
+            <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+              <div
+                className={`border p-3.5 ${isSwiss ? '' : 'rounded-2xl'}`}
+                style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}
+              >
+                <p className="inline-flex items-center gap-1 text-lg font-bold" style={{ color: 'var(--brand)' }}>
+                  <ClockIcon className="h-4 w-4" />
                   {formatHours(profile.reading_seconds)}
                 </p>
-                <p className="text-xs text-stone-500 dark:text-stone-400">Giờ đọc</p>
-              </div>
-              <div className="rounded-xl bg-stone-100 p-3 dark:bg-stone-800">
-                <p className="text-lg font-bold text-amber-800 dark:text-amber-300">
-                  💎 {profile.spirit_stones}
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
+                  Giờ tu luyện
                 </p>
-                <p className="text-xs text-stone-500 dark:text-stone-400">Linh thạch</p>
               </div>
-              <div className="rounded-xl bg-stone-100 p-3 dark:bg-stone-800">
-                <p className="text-lg font-bold text-amber-800 dark:text-amber-300">{shelfCount}</p>
-                <p className="text-xs text-stone-500 dark:text-stone-400">Truyện trong tủ</p>
+              <div
+                className={`border p-3.5 ${isSwiss ? '' : 'rounded-2xl'}`}
+                style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}
+              >
+                <p className="inline-flex items-center gap-1 text-lg font-bold" style={{ color: 'var(--brand)' }}>
+                  <GemIcon className="h-4 w-4" />
+                  {profile.spirit_stones}
+                </p>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
+                  Linh thạch
+                </p>
+              </div>
+              <div
+                className={`border p-3.5 ${isSwiss ? '' : 'rounded-2xl'}`}
+                style={{ borderColor: 'var(--border)', background: 'var(--surface-alt)' }}
+              >
+                <p className="inline-flex items-center gap-1 text-lg font-bold" style={{ color: 'var(--brand)' }}>
+                  <BookmarkIcon className="h-4 w-4" />
+                  {shelfCount}
+                </p>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--muted)' }}>
+                  Truyện trong tủ
+                </p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Nhiệm vụ / Thành tựu / Danh hiệu */}
-      <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto">
-        {SUBTABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setSubTab(t.id)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-bold ${
-              subTab === t.id
-                ? 'bg-amber-700 text-white dark:bg-amber-600'
-                : 'border border-amber-700/40 text-amber-800 dark:border-amber-500/40 dark:text-amber-300'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Sub-tabs */}
+      <div className="no-scrollbar mt-6 flex gap-2 overflow-x-auto pb-1">
+        {SUBTABS.map((t) => {
+          const active = subTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setSubTab(t.id)}
+              className={`shrink-0 cursor-pointer border px-5 py-2 text-sm font-bold transition ${
+                isSwiss ? 'font-mono-tech uppercase' : 'rounded-full'
+              }`}
+              style={
+                active
+                  ? {
+                      background: 'var(--brand)',
+                      color: '#fff',
+                      borderColor: 'var(--brand)',
+                    }
+                  : {
+                      background: 'var(--card-bg)',
+                      color: 'var(--ink)',
+                      borderColor: 'var(--border)',
+                    }
+              }
+            >
+              {t.label}
+            </button>
+          );
+        })}
       </div>
-      <div className="mt-3">
+
+      <div className="mt-4">
         {subTab === 'quests' && <QuestPanel userId={user.id} />}
         {subTab === 'achievements' && <AchievementPanel userId={user.id} />}
         {subTab === 'titles' && <TitlePanel userId={user.id} />}

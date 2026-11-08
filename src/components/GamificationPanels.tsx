@@ -15,21 +15,15 @@ import {
   type QuestView,
 } from '../lib/gamification';
 import { titleAnimClass, titleStyle } from './UserTitle';
-
-const card =
-  'rounded-2xl border border-amber-900/15 bg-white p-4 shadow-sm dark:border-amber-100/10 dark:bg-stone-900';
-const btnPrimary =
-  'rounded-full bg-amber-700 px-4 py-1.5 text-sm font-bold text-white hover:bg-amber-800 disabled:opacity-50 dark:bg-amber-600 dark:hover:bg-amber-500';
-const btnGhost =
-  'rounded-full border border-amber-700/40 px-4 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-stone-800';
+import { CheckIcon, GemIcon } from './icons';
 
 function ProgressBar({ value, max }: { value: number; max: number }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-700">
+    <div className="h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
       <div
-        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all"
-        style={{ width: `${pct}%` }}
+        className="h-full rounded-full transition-all"
+        style={{ width: `${pct}%`, background: 'var(--brand)' }}
       />
     </div>
   );
@@ -55,9 +49,9 @@ function fmtProgress(t: string, v: number): string {
 /* ---------------- Tab Nhiệm vụ ---------------- */
 
 const PERIODS: { id: Period; label: string }[] = [
-  { id: 'daily', label: '📅 Ngày' },
-  { id: 'weekly', label: '🗓️ Tuần' },
-  { id: 'monthly', label: '📆 Tháng' },
+  { id: 'daily', label: 'Hàng ngày' },
+  { id: 'weekly', label: 'Hàng tuần' },
+  { id: 'monthly', label: 'Hàng tháng' },
 ];
 
 export function QuestPanel({ userId }: { userId: string }) {
@@ -81,7 +75,7 @@ export function QuestPanel({ userId }: { userId: string }) {
     setClaiming(q.id);
     try {
       const reward = await claimQuest(userId, q.id);
-      toast(`💎 Nhận ${reward} linh thạch từ "${q.name}"!`);
+      toast(`Nhận ${reward} linh thạch từ "${q.name}"!`);
       await load();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Nhận thưởng thất bại.');
@@ -93,56 +87,82 @@ export function QuestPanel({ userId }: { userId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
-        {PERIODS.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setPeriod(p.id)}
-            className={`rounded-full px-4 py-1.5 text-sm font-bold ${
-              period === p.id
-                ? 'bg-amber-700 text-white dark:bg-amber-600'
-                : 'border border-amber-700/40 text-amber-800 dark:border-amber-500/40 dark:text-amber-300'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
+        {PERIODS.map((p) => {
+          const active = period === p.id;
+          return (
+            <button
+              key={p.id}
+              onClick={() => setPeriod(p.id)}
+              className="cursor-pointer rounded-full border px-4 py-1.5 text-xs font-bold transition"
+              style={
+                active
+                  ? { background: 'var(--brand)', color: '#fff', borderColor: 'var(--brand)' }
+                  : { background: 'var(--surface-alt)', color: 'var(--ink)', borderColor: 'var(--border)' }
+              }
+            >
+              {p.label}
+            </button>
+          );
+        })}
       </div>
       {loading ? (
-        <p className="py-8 text-center text-sm text-stone-500 dark:text-stone-400">Đang tải nhiệm vụ...</p>
+        <p className="py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
+          Đang tải nhiệm vụ...
+        </p>
       ) : quests.length === 0 ? (
-        <p className="py-8 text-center text-sm italic text-stone-500 dark:text-stone-400">
+        <p className="py-8 text-center text-sm italic" style={{ color: 'var(--muted)' }}>
           Chưa có nhiệm vụ nào cho kỳ này.
         </p>
       ) : (
         quests.map((q) => (
-          <div key={q.id} className={card}>
+          <div
+            key={q.id}
+            className="rounded-2xl border p-4 shadow-sm"
+            style={{ borderColor: 'var(--border)', background: 'var(--card-bg)' }}
+          >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-bold text-stone-900 dark:text-stone-100">{q.name}</p>
-                <p className="text-xs text-stone-500 dark:text-stone-400">{q.description}</p>
+                <p className="font-bold" style={{ color: 'var(--ink)' }}>
+                  {q.name}
+                </p>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                  {q.description}
+                </p>
               </div>
-              <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                💎 {q.reward_stones}
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold"
+                style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+              >
+                <GemIcon className="h-3 w-3" /> {q.reward_stones}
               </span>
             </div>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-3 flex items-center gap-3">
               <div className="flex-1">
                 <ProgressBar value={q.progress} max={q.target_value} />
               </div>
-              <span className="shrink-0 text-xs text-stone-500 dark:text-stone-400">
-                {fmtProgress(q.target_type, Math.min(q.progress, q.target_value))}/
+              <span className="shrink-0 text-xs font-medium" style={{ color: 'var(--muted)' }}>
+                {fmtProgress(q.target_type, Math.min(q.progress, q.target_value))} /{' '}
                 {fmtTarget(q.target_type, q.target_value)}
               </span>
             </div>
-            <div className="mt-2">
+            <div className="mt-3">
               {q.claimed ? (
-                <span className="text-xs font-semibold text-stone-400">✅ Đã nhận thưởng</span>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold" style={{ color: 'var(--muted)' }}>
+                  <CheckIcon className="h-3.5 w-3.5" /> Đã nhận thưởng
+                </span>
               ) : q.completed ? (
-                <button onClick={() => void claim(q)} disabled={claiming === q.id} className={btnPrimary}>
-                  {claiming === q.id ? 'Đang nhận...' : '🎁 Nhận thưởng'}
+                <button
+                  onClick={() => void claim(q)}
+                  disabled={claiming === q.id}
+                  className="cursor-pointer rounded-full px-4 py-1.5 text-xs font-bold text-white"
+                  style={{ background: 'var(--brand)' }}
+                >
+                  {claiming === q.id ? 'Đang nhận...' : 'Nhận thưởng'}
                 </button>
               ) : (
-                <span className="text-xs text-stone-500 dark:text-stone-400">Chưa hoàn thành</span>
+                <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                  Chưa hoàn thành
+                </span>
               )}
             </div>
           </div>
@@ -155,12 +175,12 @@ export function QuestPanel({ userId }: { userId: string }) {
 /* ---------------- Tab Thành tựu ---------------- */
 
 const CATEGORIES: { id: string; label: string }[] = [
-  { id: 'reading', label: '📖 Đọc truyện' },
-  { id: 'cultivation', label: '⚔️ Tu vi' },
-  { id: 'wealth', label: '💎 Tài phú' },
-  { id: 'collection', label: '🎒 Sưu tầm' },
-  { id: 'streak', label: '🔥 Kiên trì' },
-  { id: 'explore', label: '🧭 Khám phá' },
+  { id: 'reading', label: 'Đọc truyện' },
+  { id: 'cultivation', label: 'Tu vi' },
+  { id: 'wealth', label: 'Tài phú' },
+  { id: 'collection', label: 'Sưu tầm' },
+  { id: 'streak', label: 'Kiên trì' },
+  { id: 'explore', label: 'Khám phá' },
 ];
 
 export function AchievementPanel({ userId }: { userId: string }) {
@@ -182,7 +202,7 @@ export function AchievementPanel({ userId }: { userId: string }) {
     setClaiming(a.id);
     try {
       const reward = await claimAchievement(userId, a.id);
-      toast(`💎 Nhận ${reward} linh thạch từ "${a.name}"!`);
+      toast(`Nhận ${reward} linh thạch từ "${a.name}"!`);
       await load();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Nhận thưởng thất bại.');
@@ -198,53 +218,89 @@ export function AchievementPanel({ userId }: { userId: string }) {
       arr.push(a);
       g.set(a.category, arr);
     }
-    return CATEGORIES.map((c) => ({ ...c, items: g.get(c.id) ?? [] })).filter((c) => c.items.length > 0);
+    return CATEGORIES.map((c) => ({ ...c, items: g.get(c.id) ?? [] })).filter(
+      (c) => c.items.length > 0,
+    );
   }, [achs]);
 
   const doneCount = achs.filter((a) => a.completed).length;
 
   if (loading) {
-    return <p className="py-8 text-center text-sm text-stone-500 dark:text-stone-400">Đang tải thành tựu...</p>;
+    return (
+      <p className="py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
+        Đang tải thành tựu...
+      </p>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-stone-500 dark:text-stone-400">
-        Đã mở khóa <span className="font-bold text-amber-700 dark:text-amber-300">{doneCount}/{achs.length}</span> thành
-        tựu
+    <div className="space-y-5">
+      <p className="text-sm" style={{ color: 'var(--muted)' }}>
+        Đã mở khóa{' '}
+        <strong style={{ color: 'var(--brand)' }}>
+          {doneCount}/{achs.length}
+        </strong>{' '}
+        thành tựu
       </p>
       {grouped.map((g) => (
         <div key={g.id}>
-          <p className="mb-2 font-bold text-stone-800 dark:text-stone-200">{g.label}</p>
-          <div className="space-y-2">
+          <p className="font-display mb-2.5 text-lg font-bold" style={{ color: 'var(--ink)' }}>
+            {g.label}
+          </p>
+          <div className="space-y-2.5">
             {g.items.map((a) => (
-              <div key={a.id} className={`${card} ${a.completed ? '' : 'opacity-80'}`}>
-                <div className="flex items-start gap-3">
-                  <span className="text-3xl">{a.icon}</span>
+              <div
+                key={a.id}
+                className={`rounded-2xl border p-4 shadow-sm ${a.completed ? '' : 'opacity-80'}`}
+                style={{ borderColor: 'var(--border)', background: 'var(--card-bg)' }}
+              >
+                <div className="flex items-start gap-3.5">
+                  <span
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl"
+                    style={{ background: 'var(--surface-alt)' }}
+                  >
+                    {a.icon}
+                  </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-stone-900 dark:text-stone-100">{a.name}</p>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">{a.description}</p>
-                    <div className="mt-2 flex items-center gap-2">
+                    <p className="font-bold" style={{ color: 'var(--ink)' }}>
+                      {a.name}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                      {a.description}
+                    </p>
+                    <div className="mt-2.5 flex items-center gap-3">
                       <div className="flex-1">
                         <ProgressBar value={a.progress} max={a.target_value} />
                       </div>
-                      <span className="shrink-0 text-xs text-stone-500 dark:text-stone-400">
-                        {fmtProgress(a.target_type, Math.min(a.progress, a.target_value))}/
+                      <span className="shrink-0 text-xs" style={{ color: 'var(--muted)' }}>
+                        {fmtProgress(a.target_type, Math.min(a.progress, a.target_value))} /{' '}
                         {fmtTarget(a.target_type, a.target_value)}
                       </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                        💎 {a.reward_stones}
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold"
+                        style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+                      >
+                        <GemIcon className="h-3 w-3" /> {a.reward_stones}
                       </span>
                       {a.reward_title_code && (
-                        <span className="text-xs text-stone-500 dark:text-stone-400">+ 👑 danh hiệu</span>
+                        <span className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+                          + Danh hiệu
+                        </span>
                       )}
                       {a.claimed ? (
-                        <span className="text-xs font-semibold text-stone-400">✅ Đã nhận</span>
+                        <span className="text-xs font-semibold" style={{ color: 'var(--muted)' }}>
+                          Đã nhận
+                        </span>
                       ) : a.completed ? (
-                        <button onClick={() => void claim(a)} disabled={claiming === a.id} className={btnPrimary}>
-                          {claiming === a.id ? 'Đang nhận...' : '🎁 Nhận thưởng'}
+                        <button
+                          onClick={() => void claim(a)}
+                          disabled={claiming === a.id}
+                          className="cursor-pointer rounded-full px-4 py-1 text-xs font-bold text-white"
+                          style={{ background: 'var(--brand)' }}
+                        >
+                          {claiming === a.id ? 'Đang nhận...' : 'Nhận thưởng'}
                         </button>
                       ) : null}
                     </div>
@@ -277,8 +333,6 @@ export function TitlePanel({ userId }: { userId: string }) {
     void load();
   }, [load]);
 
-  // Tự phục hồi: nếu chưa có danh hiệu nào, thử trao bù rank 1 lần rồi tải lại
-  // (phòng trường hợp lần đầu load trước khi syncStateStats chạy xong)
   useEffect(() => {
     if (!loading && titles.length === 0 && !healed) {
       setHealed(true);
@@ -296,9 +350,9 @@ export function TitlePanel({ userId }: { userId: string }) {
     setTitles(list);
     setLoading(false);
     if (list.length === 0) {
-      alert(`🔍 Chẩn đoán: ${r.detail}\n\nChụp màn hình này gửi mình nhé!`);
+      alert(`Chẩn đoán: ${r.detail}`);
     } else {
-      toast(`👑 Đã nhận ${list.length} danh hiệu!`);
+      toast(`Đã nhận ${list.length} danh hiệu!`);
     }
   };
 
@@ -307,7 +361,7 @@ export function TitlePanel({ userId }: { userId: string }) {
     setEquipping(t.id);
     try {
       await equipTitle(userId, t.id);
-      toast(`👑 Đã đeo danh hiệu: ${t.name}`);
+      toast(`Đã đeo danh hiệu: ${t.name}`);
       await load();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Đeo danh hiệu thất bại.');
@@ -317,50 +371,65 @@ export function TitlePanel({ userId }: { userId: string }) {
   };
 
   if (loading) {
-    return <p className="py-8 text-center text-sm text-stone-500 dark:text-stone-400">Đang tải danh hiệu...</p>;
+    return (
+      <p className="py-8 text-center text-sm" style={{ color: 'var(--muted)' }}>
+        Đang tải danh hiệu...
+      </p>
+    );
   }
   if (titles.length === 0) {
     return (
       <div className="py-8 text-center">
-        <p className="text-sm italic text-stone-500 dark:text-stone-400">
-          Chưa có danh hiệu nào. Hoàn thành thành tựu hoặc tăng cấp tu vi để nhận nhé!
+        <p className="text-sm italic" style={{ color: 'var(--muted)' }}>
+          Chưa có danh hiệu nào. Hoàn thành thành tựu hoặc tăng cấp tu vi để nhận!
         </p>
-        <button onClick={() => void retry()} className={`${btnGhost} mt-3`}>
-          🔄 Kiểm tra lại danh hiệu
+        <button
+          onClick={() => void retry()}
+          className="mt-3 cursor-pointer rounded-full border px-4 py-1.5 text-xs font-semibold"
+          style={{ borderColor: 'var(--border)', color: 'var(--brand)' }}
+        >
+          Kiểm tra lại danh hiệu
         </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
-      {titles.map((t) => {
-        return (
-          <div key={t.id} className={`${card} flex items-center justify-between gap-3`}>
-            <div className="min-w-0">
-              <span
-                className={`user-title ${titleAnimClass(t.animation)}`}
-                style={titleStyle(t)}
-              >
-                {t.name}
-              </span>
-              <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-                {t.created_from === 'rank' ? '⚔️ Thăng cấp tu vi' : '🏅 Thành tựu'} · nhận{' '}
-                {new Date(t.earned_at).toLocaleDateString('vi-VN')}
-              </p>
-            </div>
-            {t.equipped ? (
-              <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                ✨ Đang đeo
-              </span>
-            ) : (
-              <button onClick={() => void equip(t)} disabled={equipping === t.id} className={btnGhost}>
-                {equipping === t.id ? '...' : 'Đeo'}
-              </button>
-            )}
+    <div className="space-y-2.5">
+      {titles.map((t) => (
+        <div
+          key={t.id}
+          className="flex items-center justify-between gap-3 rounded-2xl border p-4 shadow-sm"
+          style={{ borderColor: 'var(--border)', background: 'var(--card-bg)' }}
+        >
+          <div className="min-w-0">
+            <span className={`user-title ${titleAnimClass(t.animation)}`} style={titleStyle(t)}>
+              {t.name}
+            </span>
+            <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+              {t.created_from === 'rank' ? 'Thăng cấp tu vi' : 'Thành tựu'} • nhận{' '}
+              {new Date(t.earned_at).toLocaleDateString('vi-VN')}
+            </p>
           </div>
-        );
-      })}
+          {t.equipped ? (
+            <span
+              className="shrink-0 rounded-full px-3 py-1 text-xs font-bold"
+              style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+            >
+              Đang đeo
+            </span>
+          ) : (
+            <button
+              onClick={() => void equip(t)}
+              disabled={equipping === t.id}
+              className="cursor-pointer rounded-full border px-4 py-1.5 text-xs font-bold transition hover:opacity-80"
+              style={{ borderColor: 'var(--brand)', color: 'var(--brand)' }}
+            >
+              {equipping === t.id ? '...' : 'Trang bị'}
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

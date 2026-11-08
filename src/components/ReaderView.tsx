@@ -5,6 +5,7 @@ import { getSyncedChapter } from '../lib/library';
 import { getSupabase } from '../lib/supabase';
 import { bumpStat } from '../lib/gamification';
 import { useChrome } from '../context/ChromeContext';
+import { useTemplate } from '../context/TemplateContext';
 
 interface Block {
   num: number;
@@ -35,27 +36,28 @@ function ContentBody({ text }: { text: string }) {
   );
 }
 
-/**
- * Trình đọc cuộn vô hạn: IntersectionObserver ở cuối trang tự tải chương
- * tiếp theo nối vào, đồng thời lưu reading_progress.
- * (Parent nên key component theo startChapter để reset khi đổi chương.)
- */
 export default function ReaderView({ source, novel, chapters, startChapter, userId }: Props) {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ended, setEnded] = useState(false);
+  const [fontSize, setFontSize] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('mt-reader-size')) || 18;
+    } catch {
+      return 18;
+    }
+  });
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef = useRef(false);
   loadingRef.current = loading;
   const startedRef = useRef(false);
 
-  /* --- Chạm vào nội dung để ẩn/hiện navbar + dock (đọc toàn màn hình) --- */
   const { toggle: toggleChrome, setHidden: setChromeHidden } = useChrome();
+  const { template } = useTemplate();
   const tapRef = useRef<{ x: number; y: number; t: number } | null>(null);
   const [showHint, setShowHint] = useState(true);
 
-  // rời khỏi màn hình đọc → luôn hiện lại giao diện
   useEffect(() => {
     return () => setChromeHidden(false);
   }, [setChromeHidden]);
@@ -64,6 +66,18 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
     const id = setTimeout(() => setShowHint(false), 5000);
     return () => clearTimeout(id);
   }, []);
+
+  const changeFontSize = (delta: number) => {
+    setFontSize((s) => {
+      const next = Math.min(26, Math.max(15, s + delta));
+      try {
+        localStorage.setItem('mt-reader-size', String(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const onPointerDown = (e: React.PointerEvent) => {
     tapRef.current = { x: e.clientX, y: e.clientY, t: Date.now() };
@@ -76,9 +90,7 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
     const dx = Math.abs(e.clientX - start.x);
     const dy = Math.abs(e.clientY - start.y);
     const dt = Date.now() - start.t;
-    // chỉ tính là "chạm" khi gần như không di chuyển và thả tay nhanh (không phải cuộn/chọn chữ)
     if (dx > 12 || dy > 12 || dt > 350) return;
-    // chạm vào nút/link/ô nhập thì không chuyển chế độ
     const el = e.target as HTMLElement | null;
     if (el?.closest('a, button, input, select, textarea, [role="button"]')) return;
     setShowHint(false);
@@ -100,7 +112,6 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
           },
           { onConflict: 'user_id,source_id,novel_id' },
         );
-        // Gamification: đếm chương đã đọc, cú đêm (0–5h), số truyện khác nhau
         void bumpStat(userId, 'read_chapters', 1);
         const h = new Date().getHours();
         if (h >= 0 && h < 5) void bumpStat(userId, 'night_reads', 1);
@@ -111,10 +122,10 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
             .eq('user_id', userId);
           if (count != null) void bumpStat(userId, 'novels_read', count, 'set');
         } catch {
-          /* bỏ qua */
+          /* ignore */
         }
       } catch {
-        /* lưu tiến độ thất bại thì bỏ qua, không chặn đọc */
+        /* ignore */
       }
     },
     [userId, source.id, novel.id],
@@ -125,7 +136,6 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
       setLoading(true);
       setError(null);
       try {
-        // Ưu tiên nội dung từ database đã đồng bộ, fallback về API
         let content: string;
         let dbTitle: string | undefined;
         try {
@@ -150,7 +160,6 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Tải chương thất bại.';
         if (/\b404\b/.test(msg)) {
-          // API không còn chương tiếp theo → coi như hết truyện
           setEnded(true);
           setError(null);
         } else {
@@ -163,7 +172,6 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
     [source, novel.id, chapters, saveProgress],
   );
 
-  // Tải chương đầu khi mount
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
@@ -171,7 +179,6 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Số chương tiếp theo cần tải
   const lastNum = blocks.length ? Math.max(...blocks.map((b) => b.num)) : startChapter - 1;
   const nextNum: number | null = (() => {
     if (ended) return null;
@@ -181,7 +188,6 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
     return nx ? nx.number : null;
   })();
 
-  // Cuộn tới gần cuối → tự tải chương tiếp theo
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || nextNum === null) return;
@@ -197,43 +203,99 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
     return () => obs.disconnect();
   }, [nextNum, loadChapter]);
 
+  const isCoPhong = template === 'co-phong';
+  const isSwiss = template === 'toi-gian';
+
   return (
     <article
-      className="relative mx-auto max-w-3xl px-4 py-6"
+      className="relative mx-auto max-w-3xl px-4 py-6 sm:px-6"
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
     >
       {showHint && (
         <div className="pointer-events-none sticky top-3 z-10 mb-3 flex justify-center">
-          <span className="rounded-full bg-stone-900/80 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur dark:bg-white/85 dark:text-stone-900">
-            👆 Chạm vào màn hình để ẩn giao diện · đọc toàn màn hình
+          <span
+            className="rounded-full px-4 py-1.5 text-xs font-semibold shadow-lg backdrop-blur"
+            style={{ background: 'var(--ink)', color: 'var(--page-bg)' }}
+          >
+            Chạm vào giữa màn hình để ẩn/hiện thanh điều hướng
           </span>
         </div>
       )}
-      <h1 className="font-display text-center text-2xl font-bold text-amber-950 dark:text-amber-100">
-        {novel.title}
-      </h1>
-      {novel.author && (
-        <p className="mt-1 text-center text-sm text-stone-500 dark:text-stone-400">
-          Tác giả: {novel.author}
-        </p>
-      )}
 
-      <div className="mt-6 space-y-10">
+      {/* Thanh tùy chỉnh cỡ chữ */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b pb-4" style={{ borderColor: 'var(--border)' }}>
+        <div>
+          <h1 className="font-display text-xl font-bold sm:text-2xl" style={{ color: 'var(--ink)' }}>
+            {novel.title}
+          </h1>
+          {novel.author && (
+            <p className="text-xs" style={{ color: 'var(--muted)' }}>
+              Tác giả: {novel.author}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => changeFontSize(-1)}
+            className="cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:opacity-80"
+            style={{ borderColor: 'var(--border)', background: 'var(--card-bg)', color: 'var(--ink)' }}
+            title="Giảm cỡ chữ"
+          >
+            A-
+          </button>
+          <span className="px-1.5 text-xs font-semibold" style={{ color: 'var(--muted)' }}>
+            {fontSize}px
+          </span>
+          <button
+            type="button"
+            onClick={() => changeFontSize(1)}
+            className="cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-bold transition hover:opacity-80"
+            style={{ borderColor: 'var(--border)', background: 'var(--card-bg)', color: 'var(--ink)' }}
+            title="Tăng cỡ chữ"
+          >
+            A+
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-12">
         {blocks.map((b) => (
-          <section key={b.num} className="animate-fade-up">
-            <div className="mb-4 flex items-center gap-3">
-              <span className="h-px flex-1 bg-amber-900/20 dark:bg-amber-100/15" />
-              <h2 className="font-display text-lg font-bold text-amber-800 dark:text-amber-300">
+          <section
+            key={b.num}
+            className={`animate-fade-up ${
+              isCoPhong
+                ? 'cophong-frame p-6 sm:p-10'
+                : isSwiss
+                  ? 'border p-6 sm:p-10'
+                  : 'rounded-3xl border p-6 shadow-sm sm:p-10'
+            }`}
+            style={{
+              borderColor: 'var(--border)',
+              background: 'var(--card-bg)',
+            }}
+          >
+            <div className="mb-6 flex items-center gap-3">
+              <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
+              <h2
+                className="font-display text-center text-lg font-bold sm:text-2xl"
+                style={{ color: 'var(--brand)' }}
+              >
                 {b.title}
               </h2>
-              <span className="h-px flex-1 bg-amber-900/20 dark:bg-amber-100/15" />
+              <span className="h-px flex-1" style={{ background: 'var(--border)' }} />
             </div>
-            <div className="chapter-content text-[17px] text-stone-800 dark:text-stone-200">
+            <div
+              className="chapter-content"
+              style={{ fontSize: `${fontSize}px`, color: 'var(--ink)' }}
+            >
               {b.content ? (
                 <ContentBody text={b.content} />
               ) : (
-                <p className="italic text-stone-400">(Chương này chưa có nội dung.)</p>
+                <p className="italic" style={{ color: 'var(--muted)' }}>
+                  (Chương này chưa có nội dung.)
+                </p>
               )}
             </div>
           </section>
@@ -249,16 +311,20 @@ export default function ReaderView({ source, novel, chapters, startChapter, user
         </div>
       )}
 
-      <div ref={sentinelRef} className="py-8 text-center">
-        {loading && <p className="text-sm text-stone-500 dark:text-stone-400">📖 Đang nối chương tiếp theo...</p>}
+      <div ref={sentinelRef} className="py-10 text-center">
+        {loading && (
+          <p className="text-sm font-medium" style={{ color: 'var(--muted)' }}>
+            Đang nối chương tiếp theo...
+          </p>
+        )}
         {!loading && (ended || nextNum === null) && blocks.length > 0 && (
-          <p className="text-sm italic text-stone-500 dark:text-stone-400">
-            — Hết chương —
+          <p className="text-sm italic" style={{ color: 'var(--muted)' }}>
+            — Đã tới chương mới nhất —
           </p>
         )}
         {!loading && ended && blocks.length === 0 && !error && (
-          <p className="text-sm italic text-stone-500 dark:text-stone-400">
-            API chưa có nội dung chương này.
+          <p className="text-sm italic" style={{ color: 'var(--muted)' }}>
+            Nguồn dữ liệu chưa có nội dung chương này.
           </p>
         )}
       </div>

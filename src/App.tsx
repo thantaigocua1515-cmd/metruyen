@@ -135,8 +135,14 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
-            <footer className="border-t border-amber-900/10 py-4 text-center text-xs text-stone-400 dark:border-amber-100/10 dark:text-stone-500">
-              📚 Mê Truyện — thư các tu tiên · đọc để tăng tu vi
+            <footer
+              className="border-t py-6 text-center text-xs"
+              style={{
+                borderColor: 'var(--border, rgba(120,113,108,0.18))',
+                color: 'var(--muted)',
+              }}
+            >
+              Mê Truyện — Thư các tu tiên • Đọc truyện tích lũy tu vi
             </footer>
             <BottomTabBar />
             <PresenceBootstrap />

@@ -5,13 +5,25 @@ import { fetchNovelDetail } from '../lib/novelApi';
 import type { ApiSourceRow, NovelDetail as NovelDetailType } from '../lib/novelApi';
 import { getSyncedNovel, getSyncedNovelChapterList } from '../lib/library';
 import { useAuth } from '../context/AuthContext';
+import { useTemplate } from '../context/TemplateContext';
 import { syncStateStats } from '../lib/gamification';
+import { genreLabel, guessGenre } from '../lib/genres';
+import {
+  ArrowLeftIcon,
+  BookmarkIcon,
+  BookOpenIcon,
+  CheckIcon,
+  DownloadIcon,
+  PlusIcon,
+  ScrollIcon,
+} from '../components/icons';
 
-const PAGE_SIZE = 80;
+const PAGE_SIZE = 90;
 
 export default function NovelDetail() {
   const { sourceId, novelId } = useParams<{ sourceId: string; novelId: string }>();
   const { user } = useAuth();
+  const { template } = useTemplate();
   const navigate = useNavigate();
   const [detail, setDetail] = useState<NovelDetailType | null>(null);
   const [overrideCover, setOverrideCover] = useState<string | null>(null);
@@ -32,18 +44,15 @@ export default function NovelDetail() {
       try {
         const supabase = getSupabase();
         let d: NovelDetailType;
-        // Ưu tiên mục lục THẬT từ database đã đồng bộ (tiêu đề chương thật,
-        // chính xác hơn danh sách ảo sinh từ số lượng)
         let db = false;
         if (sourceId === 'manual') {
-          // Truyện nhập tay: đọc trực tiếp từ DB, không qua api_sources
           const row = await getSyncedNovel(`${sourceId}:${novelId}`);
           if (!row) throw new Error('Không tìm thấy truyện.');
           const syncedList = await getSyncedNovelChapterList(row.id).catch(() => []);
           db = syncedList.length > 0;
           d = {
             sourceId: 'manual',
-            sourceName: '📝 Nhập tay',
+            sourceName: 'Nhập tay',
             id: row.api_id,
             title: row.title,
             author: row.author,
@@ -73,7 +82,7 @@ export default function NovelDetail() {
               db = true;
             }
           } catch {
-            /* bảng chưa có / lỗi DB → dùng mục lục API như cũ */
+            /* fallback API */
           }
         }
         const { data: ov } = await supabase
@@ -155,126 +164,339 @@ export default function NovelDetail() {
   };
 
   if (loading) {
-    return <p className="py-16 text-center text-stone-500 dark:text-stone-400">Đang mở thư tịch...</p>;
+    return (
+      <div className="py-24 text-center" style={{ color: 'var(--muted)' }}>
+        <div
+          className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-2 border-current border-t-transparent"
+          style={{ color: 'var(--brand)' }}
+        />
+        <p className="text-sm font-medium">Đang mở thư tịch...</p>
+      </div>
+    );
   }
   if (error || !detail) {
     return (
-      <p className="py-16 text-center text-red-600 dark:text-red-400">{error ?? 'Không tìm thấy truyện.'}</p>
+      <p className="py-20 text-center text-red-600 dark:text-red-400">
+        {error ?? 'Không tìm thấy truyện.'}
+      </p>
     );
   }
 
   const cover = overrideCover || detail.coverUrl;
   const readable = detail.translatedChaptersCount || detail.chaptersCount;
   const visibleChapters = detail.chapters.slice(0, showCount);
+  const genre = genreLabel(guessGenre(detail));
+
+  const isSwiss = template === 'toi-gian';
+  const isCoPhong = template === 'co-phong';
+  const isArcane = template === 'da-huyen-ao';
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
-      <div className="flex flex-col gap-6 sm:flex-row">
-        {cover && (
-          <img
-            src={cover}
-            alt={detail.title}
-            className="mx-auto w-48 shrink-0 rounded-xl border border-amber-900/20 object-cover shadow-lg sm:mx-0 sm:w-56 dark:border-amber-100/15"
-          />
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mb-4">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold transition hover:opacity-75"
+          style={{ color: 'var(--muted)' }}
+        >
+          <ArrowLeftIcon className="h-3.5 w-3.5" />
+          Quay lại danh mục
+        </Link>
+      </div>
+
+      {/* HERO CARD */}
+      <div
+        className={`relative overflow-hidden p-5 sm:p-8 ${
+          isSwiss
+            ? 'border'
+            : isCoPhong
+              ? 'cophong-frame'
+              : isArcane
+                ? 'arcane-card rounded-3xl'
+                : 'rounded-3xl border shadow-sm'
+        }`}
+        style={{
+          borderColor: 'var(--border)',
+          background: isArcane ? undefined : 'var(--card-bg)',
+        }}
+      >
+        {/* Blurred backdrop cho Tinh Hà & TruyenC */}
+        {(template === 'tinh-ha' || template === 'truyenc') && cover && (
+          <div className="pointer-events-none absolute inset-0 opacity-15 blur-2xl" aria-hidden="true">
+            <img src={cover} alt="" className="h-full w-full object-cover" />
+          </div>
         )}
-        <div className="min-w-0 flex-1">
-          <h1 className="font-display text-2xl font-bold text-amber-950 sm:text-3xl dark:text-amber-100">
-            {detail.title}
-          </h1>
-          {detail.author && (
-            <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">Tác giả: {detail.author}</p>
-          )}
-          <p className="mt-1 text-sm font-medium text-amber-800 dark:text-amber-300">
-            {readable} chương đọc được / {detail.chaptersCount} chương · Nguồn: {detail.sourceName}
-          </p>
-          {detail.description && (
-            <p className="clamp-3 mt-3 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
-              {detail.description}
-            </p>
-          )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              onClick={() => navigate(`/read/${sourceId}/${encodeURIComponent(detail.id)}/${continueChapter}`)}
-              className="rounded-full bg-amber-700 px-6 py-2 font-semibold text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
+
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+          {cover && (
+            <div
+              className={`mx-auto w-44 shrink-0 overflow-hidden md:mx-0 md:w-56 ${
+                template === 'thu-cac'
+                  ? 'book-spine rounded-r-xl rounded-l-sm'
+                  : isSwiss
+                    ? 'border'
+                    : isCoPhong
+                      ? 'border-2 p-1.5'
+                      : 'rounded-2xl shadow-xl'
+              }`}
+              style={{ borderColor: 'var(--border)' }}
             >
-              📖 {continueChapter > 1 ? `Đọc tiếp chương ${continueChapter}` : 'Bắt đầu đọc'}
-            </button>
-            {user && (
-              <button
-                onClick={() => void toggleShelf()}
-                className={`rounded-full px-6 py-2 font-semibold ${
-                  inShelf
-                    ? 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-200'
-                    : 'border border-amber-700 text-amber-800 dark:border-amber-500 dark:text-amber-300'
+              <img
+                src={cover}
+                alt={detail.title}
+                className="aspect-[3/4] w-full object-cover"
+              />
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`px-3 py-1 text-xs font-bold ${
+                  isSwiss
+                    ? 'font-mono-tech border uppercase'
+                    : isCoPhong
+                      ? 'cophong-seal'
+                      : 'rounded-full'
                 }`}
+                style={
+                  isCoPhong
+                    ? undefined
+                    : {
+                        background: 'var(--brand-soft)',
+                        color: 'var(--brand-strong)',
+                        borderColor: 'var(--border)',
+                      }
+                }
               >
-                {inShelf ? '✓ Đã lưu tủ truyện' : '＋ Lưu tủ truyện'}
+                {genre}
+              </span>
+              <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                Nguồn: <strong>{detail.sourceName}</strong>
+              </span>
+              {fromDb && (
+                <span
+                  className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                  style={{ background: 'var(--surface-alt)', color: 'var(--muted)' }}
+                >
+                  Đã đồng bộ máy chủ
+                </span>
+              )}
+            </div>
+
+            <h1
+              className={`font-display mt-3 text-2xl font-bold leading-tight sm:text-4xl ${
+                isSwiss ? 'uppercase tracking-tight' : ''
+              }`}
+              style={{ color: 'var(--ink)' }}
+            >
+              {detail.title}
+            </h1>
+
+            {detail.author && (
+              <p className="mt-1.5 text-sm font-medium" style={{ color: 'var(--muted)' }}>
+                Tác giả: <span style={{ color: 'var(--ink)' }}>{detail.author}</span>
+              </p>
+            )}
+
+            {/* Stats Row */}
+            <div
+              className="mt-4 inline-flex flex-wrap items-center gap-4 rounded-2xl px-4 py-2.5 text-xs sm:text-sm"
+              style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)' }}
+            >
+              <div>
+                <span style={{ color: 'var(--muted)' }}>Số chương đọc được: </span>
+                <strong style={{ color: 'var(--brand)' }}>{readable}</strong>
+                <span style={{ color: 'var(--muted)' }}> / {detail.chaptersCount}</span>
+              </div>
+              {continueChapter > 1 && (
+                <>
+                  <span>•</span>
+                  <div>
+                    <span style={{ color: 'var(--muted)' }}>Đang đọc: </span>
+                    <strong style={{ color: 'var(--ink)' }}>Chương {continueChapter}</strong>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {detail.description && (
+              <p
+                className="mt-4 whitespace-pre-line text-sm leading-relaxed sm:text-[15px]"
+                style={{ color: 'var(--muted)' }}
+              >
+                {detail.description}
+              </p>
+            )}
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                onClick={() =>
+                  navigate(`/read/${sourceId}/${encodeURIComponent(detail.id)}/${continueChapter}`)
+                }
+                className={`inline-flex h-11 cursor-pointer items-center gap-2 px-6 text-sm font-bold text-white shadow transition hover:opacity-90 ${
+                  isSwiss ? '' : 'rounded-full'
+                }`}
+                style={{ background: 'var(--brand)' }}
+              >
+                <BookOpenIcon className="h-4 w-4" />
+                {continueChapter > 1 ? `Đọc tiếp chương ${continueChapter}` : 'Bắt đầu đọc'}
               </button>
-            )}
-            {detail.links.epub && (
-              <a
-                href={detail.links.epub}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-full border border-stone-300 px-6 py-2 font-semibold text-stone-600 hover:bg-stone-100 dark:border-stone-600 dark:text-stone-300 dark:hover:bg-stone-800"
-              >
-                ⬇ EPUB
-              </a>
-            )}
+
+              {user && (
+                <button
+                  onClick={() => void toggleShelf()}
+                  className={`inline-flex h-11 cursor-pointer items-center gap-2 border px-5 text-sm font-semibold transition hover:opacity-85 ${
+                    isSwiss ? '' : 'rounded-full'
+                  }`}
+                  style={
+                    inShelf
+                      ? {
+                          background: 'var(--brand-soft)',
+                          color: 'var(--brand-strong)',
+                          borderColor: 'var(--brand)',
+                        }
+                      : {
+                          background: 'var(--card-bg)',
+                          color: 'var(--ink)',
+                          borderColor: 'var(--border)',
+                        }
+                  }
+                >
+                  {inShelf ? <CheckIcon className="h-4 w-4" /> : <PlusIcon className="h-4 w-4" />}
+                  {inShelf ? 'Đã lưu tủ truyện' : 'Lưu vào tủ truyện'}
+                </button>
+              )}
+
+              {detail.links.epub && (
+                <a
+                  href={detail.links.epub}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`inline-flex h-11 items-center gap-2 border px-5 text-sm font-semibold transition hover:opacity-80 ${
+                    isSwiss ? '' : 'rounded-full'
+                  }`}
+                  style={{
+                    borderColor: 'var(--border)',
+                    color: 'var(--muted)',
+                    background: 'var(--surface-alt)',
+                  }}
+                >
+                  <DownloadIcon className="h-4 w-4" />
+                  Tải EPUB
+                </a>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <h2 className="font-display mt-8 text-xl font-bold text-amber-950 dark:text-amber-100">
-        📜 Mục lục ({detail.chapters.length} chương)
-        {fromDb && (
-          <span className="ml-2 align-middle text-xs font-normal text-stone-500 dark:text-stone-400">
-            📦 từ database đã đồng bộ
-          </span>
-        )}
-      </h2>
-      <div className="mt-2 flex gap-2">
-        <input
-          value={jump}
-          onChange={(e) => setJump(e.target.value.replace(/\D/g, ''))}
-          placeholder="Nhảy tới chương số..."
-          inputMode="numeric"
-          className="w-48 rounded-full border border-amber-900/20 bg-white px-4 py-1.5 text-sm outline-none focus:border-amber-500 dark:border-amber-100/15 dark:bg-stone-900 dark:text-stone-100"
-        />
-        <button
-          onClick={() => {
-            const n = parseInt(jump, 10);
-            if (n > 0) navigate(`/read/${sourceId}/${encodeURIComponent(detail.id)}/${n}`);
-          }}
-          className="rounded-full bg-stone-800 px-4 py-1.5 text-sm font-semibold text-white dark:bg-stone-700"
+      {/* CHAPTER INDEX */}
+      <div className="mt-10">
+        <div
+          className="flex flex-wrap items-center justify-between gap-4 border-b pb-4"
+          style={{ borderColor: 'var(--border)' }}
         >
-          Đi
-        </button>
-      </div>
+          <div className="flex items-center gap-2.5">
+            <span
+              className="flex h-9 w-9 items-center justify-center rounded-xl"
+              style={{ background: 'var(--brand-soft)', color: 'var(--brand-strong)' }}
+            >
+              <ScrollIcon className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="font-display text-xl font-bold sm:text-2xl" style={{ color: 'var(--ink)' }}>
+                Mục lục chương ({detail.chapters.length})
+              </h2>
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                Chọn chương bất kỳ để bắt đầu đọc nối chương tự động
+              </p>
+            </div>
+          </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleChapters.map((c) => (
-          <Link
-            key={c.number}
-            to={`/read/${sourceId}/${encodeURIComponent(detail.id)}/${c.number}`}
-            className={`truncate rounded-lg border px-3 py-2 text-sm transition hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-stone-800 ${
-              c.number === continueChapter
-                ? 'border-amber-500 bg-amber-50 font-semibold text-amber-900 dark:bg-stone-800 dark:text-amber-200'
-                : 'border-amber-900/15 text-stone-700 dark:border-amber-100/10 dark:text-stone-300'
+          <div className="flex items-center gap-2">
+            <input
+              value={jump}
+              onChange={(e) => setJump(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const n = parseInt(jump, 10);
+                  if (n > 0) navigate(`/read/${sourceId}/${encodeURIComponent(detail.id)}/${n}`);
+                }
+              }}
+              placeholder="Nhảy tới chương số..."
+              inputMode="numeric"
+              aria-label="Nhảy tới chương số"
+              className={`h-10 w-44 border bg-[var(--card-bg)] px-4 text-sm outline-none ${
+                isSwiss ? '' : 'rounded-full'
+              }`}
+              style={{ borderColor: 'var(--border)', color: 'var(--ink)' }}
+            />
+            <button
+              onClick={() => {
+                const n = parseInt(jump, 10);
+                if (n > 0) navigate(`/read/${sourceId}/${encodeURIComponent(detail.id)}/${n}`);
+              }}
+              className={`h-10 cursor-pointer px-5 text-sm font-bold text-white ${
+                isSwiss ? '' : 'rounded-full'
+              }`}
+              style={{ background: 'var(--brand)' }}
+            >
+              Đi
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleChapters.map((c) => {
+            const isCurrent = c.number === continueChapter;
+            return (
+              <Link
+                key={c.number}
+                to={`/read/${sourceId}/${encodeURIComponent(detail.id)}/${c.number}`}
+                className={`flex items-center justify-between gap-2 border px-3.5 py-2.5 text-sm transition hover:border-[var(--brand)] ${
+                  isSwiss ? '' : 'rounded-xl'
+                }`}
+                style={
+                  isCurrent
+                    ? {
+                        borderColor: 'var(--brand)',
+                        background: 'var(--brand-soft)',
+                        color: 'var(--brand-strong)',
+                        fontWeight: 600,
+                      }
+                    : {
+                        borderColor: 'var(--border)',
+                        background: 'var(--card-bg)',
+                        color: 'var(--ink)',
+                      }
+                }
+              >
+                <span className="truncate">{c.title}</span>
+                {isCurrent && (
+                  <BookmarkIcon className="h-3.5 w-3.5 shrink-0" />
+                )}
+              </Link>
+            );
+          })}
+        </div>
+
+        {showCount < detail.chapters.length && (
+          <button
+            onClick={() => setShowCount((c) => c + PAGE_SIZE * 2)}
+            className={`mt-6 w-full cursor-pointer border py-3 text-sm font-bold transition hover:opacity-85 ${
+              isSwiss ? '' : 'rounded-2xl'
             }`}
+            style={{
+              borderColor: 'var(--border)',
+              background: 'var(--surface-alt)',
+              color: 'var(--brand-strong)',
+            }}
           >
-            {c.title}
-          </Link>
-        ))}
+            Xem thêm chương ({detail.chapters.length - showCount} chương còn lại)
+          </button>
+        )}
       </div>
-      {showCount < detail.chapters.length && (
-        <button
-          onClick={() => setShowCount((c) => c + PAGE_SIZE * 2)}
-          className="mt-4 w-full rounded-xl border border-amber-900/20 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-100/15 dark:text-amber-300 dark:hover:bg-stone-800"
-        >
-          Xem thêm chương ({detail.chapters.length - showCount} còn lại)
-        </button>
-      )}
     </div>
   );
 }
