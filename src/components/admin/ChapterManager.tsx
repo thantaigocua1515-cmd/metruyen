@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getSupabase } from '../../lib/supabase';
+import { getSyncedNovelChapterList } from '../../lib/library';
 import {
   translateText,
   getTranslationStyles,
@@ -87,15 +88,13 @@ export default function ChapterManager() {
     setPage(0);
     (async () => {
       try {
-        const sb = getSupabase();
-        const { data, error } = await sb
-          .from('synced_chapters')
-          .select('chapter_number,title')
-          .eq('novel_id', novelId)
-          .order('chapter_number')
-          .limit(5000);
-        if (error) throw error;
-        setChapters((data ?? []) as ChapterRow[]);
+        const list = await getSyncedNovelChapterList(novelId);
+        setChapters(
+          list.map((c) => ({
+            chapter_number: c.number,
+            title: c.title,
+          })),
+        );
       } catch (e) {
         setMsg(`❌ Không tải được mục lục: ${e instanceof Error ? e.message : 'lỗi'}`);
       }

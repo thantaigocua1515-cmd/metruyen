@@ -181,8 +181,23 @@ async function refreshNovelCounts(sb: SupaAdmin, key: string): Promise<void> {
 }
 
 async function getHaveChapters(sb: SupaAdmin, key: string): Promise<Set<number>> {
-  const { data } = await sb.from('synced_chapters').select('chapter_number').eq('novel_id', key);
-  return new Set(((data ?? []) as { chapter_number: number }[]).map((r) => r.chapter_number));
+  const PAGE_SIZE = 1000;
+  const have = new Set<number>();
+  let from = 0;
+  while (true) {
+    const { data, error } = await sb
+      .from('synced_chapters')
+      .select('chapter_number')
+      .eq('novel_id', key)
+      .order('chapter_number', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) break;
+    const batch = (data ?? []) as { chapter_number: number }[];
+    for (const r of batch) have.add(r.chapter_number);
+    if (batch.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return have;
 }
 
 /* ---------------- Core: sync chương theo khoảng ---------------- */

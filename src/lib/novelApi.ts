@@ -151,10 +151,15 @@ export async function fetchNovelDetail(source: ApiSourceRow, novelId: string): P
     })
     .sort((a, b) => a.number - b.number);
   // API NovelFlow đang crawl ("status":"crawling") nên mảng chapters có thể RỖNG
-  // hoặc THIẾU (mới crawl được 1 phần). Luôn bù đủ tới translatedChaptersCount
-  // để cuộn vô hạn + mục lục không bị dừng sớm ở chương cuối của danh sách thiếu.
+  // hoặc THIẾU (mới crawl được 1 phần, hoặc bị giới hạn phân trang). Luôn bù đủ tới
+  // max(translatedChaptersCount, chaptersCount) để cuộn vô hạn + mục lục hiển thị đủ.
   let chaptersVirtual = false;
-  const total = toNumber(data.translatedChaptersCount) || toNumber(data.chaptersCount);
+  const maxInList = chapters.length > 0 ? chapters[chapters.length - 1].number : 0;
+  const total = Math.max(
+    toNumber(data.translatedChaptersCount),
+    toNumber(data.chaptersCount),
+    maxInList,
+  );
   if (total > chapters.length) {
     chaptersVirtual = chapters.length === 0;
     const have = new Set(chapters.map((c) => c.number));
@@ -163,6 +168,8 @@ export async function fetchNovelDetail(source: ApiSourceRow, novelId: string): P
     }
     chapters.sort((a, b) => a.number - b.number);
   }
+  novel.chaptersCount = Math.max(novel.chaptersCount, total);
+  novel.translatedChaptersCount = Math.max(novel.translatedChaptersCount, total);
   return { ...novel, chapters, chaptersVirtual };
 }
 

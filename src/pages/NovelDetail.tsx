@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getSupabase } from '../lib/supabase';
 import { fetchNovelDetail } from '../lib/novelApi';
 import type { ApiSourceRow, NovelDetail as NovelDetailType } from '../lib/novelApi';
-import { getSyncedNovel, getSyncedNovelChapterList } from '../lib/library';
+import { getSyncedNovel, getSyncedNovelChapterList, mergeChapterLists } from '../lib/library';
 import { useAuth } from '../context/AuthContext';
 import { useTemplate } from '../context/TemplateContext';
 import { syncStateStats } from '../lib/gamification';
@@ -32,6 +32,7 @@ export default function NovelDetail() {
   const [continueChapter, setContinueChapter] = useState(1);
   const [inShelf, setInShelf] = useState(false);
   const [showCount, setShowCount] = useState(PAGE_SIZE);
+  const [rangeIdx, setRangeIdx] = useState<number | null>(null);
   const [jump, setJump] = useState('');
   const [fromDb, setFromDb] = useState(false);
 
@@ -43,13 +44,23 @@ export default function NovelDetail() {
       setError(null);
       try {
         const supabase = getSupabase();
+        const key = `${sourceId}:${novelId}`;
         let d: NovelDetailType;
         let db = false;
         if (sourceId === 'manual') {
-          const row = await getSyncedNovel(`${sourceId}:${novelId}`);
+          const row = await getSyncedNovel(key);
           if (!row) throw new Error('Không tìm thấy truyện.');
           const syncedList = await getSyncedNovelChapterList(row.id).catch(() => []);
           db = syncedList.length > 0;
+          const totalExpected = Math.max(
+            row.chapters_count ?? 0,
+            row.translated_count ?? 0,
+            syncedList.length,
+          );
+          const chapters =
+            syncedList.length > 0
+              ? mergeChapterLists([], syncedList, totalExpected)
+              : mergeChapterLists([], [], totalExpected);
           d = {
             sourceId: 'manual',
             sourceName: 'Nhập tay',
@@ -58,11 +69,11 @@ export default function NovelDetail() {
             author: row.author,
             description: row.description,
             coverUrl: row.cover_url,
-            chaptersCount: row.chapters_count,
-            translatedChaptersCount: row.translated_count,
+            chaptersCount: Math.max(row.chapters_count, chapters.length),
+            translatedChaptersCount: Math.max(row.translated_count, chapters.length),
             status: row.status,
             links: {},
-            chapters: syncedList,
+            chapters,
             chaptersVirtual: false,
           };
         } else {
@@ -73,16 +84,43 @@ export default function NovelDetail() {
             .single();
           if (sErr || !sRow) throw new Error('Không tìm thấy nguồn truyện.');
           const src = sRow as ApiSourceRow;
-          d = await fetchNovelDetail(src, novelId);
+          const [syncedRow, syncedList] = await Promise.all([
+            getSyncedNovel(key).catch(() => null),
+            getSyncedNovelChapterList(key).catch(() => []),
+          ]);
           try {
-            const syncedList = await getSyncedNovelChapterList(`${sourceId}:${novelId}`);
-            if (syncedList.length > 0) {
-              d.chapters = syncedList;
-              d.chaptersVirtual = false;
-              db = true;
-            }
-          } catch {
-            /* fallback API */
+            d = await fetchNovelDetail(src, novelId);
+          } catch (apiErr) {
+            if (!syncedRow) throw apiErr;
+            d = {
+              sourceId: src.id,
+              sourceName: src.name,
+              id: syncedRow.api_id,
+              title: syncedRow.title,
+              author: syncedRow.author,
+              description: syncedRow.description,
+              coverUrl: syncedRow.cover_url,
+              chaptersCount: syncedRow.chapters_count,
+              translatedChaptersCount: syncedRow.translated_count,
+              status: syncedRow.status,
+              links: {},
+              chapters: [],
+              chaptersVirtual: false,
+            };
+          }
+          const totalExpected = Math.max(
+            d.chaptersCount,
+            d.translatedChaptersCount,
+            syncedRow?.chapters_count ?? 0,
+            syncedRow?.translated_count ?? 0,
+            syncedList.length,
+          );
+          d.chapters = mergeChapterLists(d.chapters, syncedList, totalExpected);
+          d.chaptersCount = Math.max(d.chaptersCount, d.chapters.length);
+          d.translatedChaptersCount = Math.max(d.translatedChaptersCount, d.chapters.length);
+          if (syncedList.length > 0) {
+            d.chaptersVirtual = false;
+            db = true;
           }
         }
         const { data: ov } = await supabase
@@ -118,6 +156,7 @@ export default function NovelDetail() {
           setContinueChapter(cont);
           setInShelf(shelf);
           setShowCount(PAGE_SIZE);
+          setRangeIdx(null);
         }
       } catch (e) {
         if (alive) setError(e instanceof Error ? e.message : 'Tải chi tiết thất bại.');
@@ -184,7 +223,20 @@ export default function NovelDetail() {
 
   const cover = overrideCover || detail.coverUrl;
   const readable = detail.translatedChaptersCount || detail.chaptersCount;
-  const visibleChapters = detail.chapters.slice(0, showCount);
+  const RANGE_STEP = 500;
+  const totalChapters = detail.chapters.length;
+  const rangeBuckets =
+    totalChapters > RANGE_STEP
+      ? Array.from({ length: Math.ceil(totalChapters / RANGE_STEP) }, (_, i) => {
+          const start = i * RANGE_STEP + 1;
+          const end = Math.min((i + 1) * RANGE_STEP, totalChapters);
+          return { index: i, label: `${start} - ${end}`, startIdx: i * RANGE_STEP, endIdx: end };
+        })
+      : [];
+  const visibleChapters =
+    rangeIdx !== null && rangeBuckets[rangeIdx]
+      ? detail.chapters.slice(rangeBuckets[rangeIdx].startIdx, rangeBuckets[rangeIdx].endIdx)
+      : detail.chapters.slice(0, showCount);
   const genre = genreLabel(guessGenre(detail));
 
   const isSwiss = template === 'toi-gian';
@@ -447,6 +499,62 @@ export default function NovelDetail() {
           </div>
         </div>
 
+        {/* Phân đoạn nhanh cho truyện dài (> 500 chương) */}
+        {rangeBuckets.length > 1 && (
+          <div className="mt-4 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs font-semibold" style={{ color: 'var(--muted)' }}>
+              Khoảng chương:
+            </span>
+            <button
+              type="button"
+              onClick={() => setRangeIdx(null)}
+              className={`cursor-pointer border px-3 py-1 text-xs font-semibold transition ${
+                isSwiss ? '' : 'rounded-full'
+              }`}
+              style={
+                rangeIdx === null
+                  ? {
+                      borderColor: 'var(--brand)',
+                      background: 'var(--brand)',
+                      color: '#fff',
+                    }
+                  : {
+                      borderColor: 'var(--border)',
+                      background: 'var(--card-bg)',
+                      color: 'var(--muted)',
+                    }
+              }
+            >
+              Mặc định
+            </button>
+            {rangeBuckets.map((b) => (
+              <button
+                key={b.index}
+                type="button"
+                onClick={() => setRangeIdx(b.index)}
+                className={`cursor-pointer border px-3 py-1 text-xs font-semibold transition ${
+                  isSwiss ? '' : 'rounded-full'
+                }`}
+                style={
+                  rangeIdx === b.index
+                    ? {
+                        borderColor: 'var(--brand)',
+                        background: 'var(--brand)',
+                        color: '#fff',
+                      }
+                    : {
+                        borderColor: 'var(--border)',
+                        background: 'var(--card-bg)',
+                        color: 'var(--muted)',
+                      }
+                }
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {visibleChapters.map((c) => {
             const isCurrent = c.number === continueChapter;
@@ -481,20 +589,35 @@ export default function NovelDetail() {
           })}
         </div>
 
-        {showCount < detail.chapters.length && (
-          <button
-            onClick={() => setShowCount((c) => c + PAGE_SIZE * 2)}
-            className={`mt-6 w-full cursor-pointer border py-3 text-sm font-bold transition hover:opacity-85 ${
-              isSwiss ? '' : 'rounded-2xl'
-            }`}
-            style={{
-              borderColor: 'var(--border)',
-              background: 'var(--surface-alt)',
-              color: 'var(--brand-strong)',
-            }}
-          >
-            Xem thêm chương ({detail.chapters.length - showCount} chương còn lại)
-          </button>
+        {rangeIdx === null && showCount < detail.chapters.length && (
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+            <button
+              onClick={() => setShowCount((c) => c + PAGE_SIZE * 2)}
+              className={`flex-1 cursor-pointer border py-3 text-sm font-bold transition hover:opacity-85 ${
+                isSwiss ? '' : 'rounded-2xl'
+              }`}
+              style={{
+                borderColor: 'var(--border)',
+                background: 'var(--surface-alt)',
+                color: 'var(--brand-strong)',
+              }}
+            >
+              Xem thêm chương ({detail.chapters.length - showCount} chương còn lại)
+            </button>
+            <button
+              onClick={() => setShowCount(detail.chapters.length)}
+              className={`cursor-pointer border px-6 py-3 text-sm font-bold transition hover:opacity-85 ${
+                isSwiss ? '' : 'rounded-2xl'
+              }`}
+              style={{
+                borderColor: 'var(--border)',
+                background: 'var(--card-bg)',
+                color: 'var(--ink)',
+              }}
+            >
+              Hiện tất cả ({detail.chapters.length})
+            </button>
+          </div>
         )}
       </div>
     </div>

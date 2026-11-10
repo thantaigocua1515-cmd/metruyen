@@ -80,17 +80,62 @@ export async function getSyncedChapter(key: string, num: number): Promise<Synced
 /**
  * Danh sách chương THẬT đã đồng bộ (số + tiêu đề thật), sắp xếp tăng dần.
  * Dùng cho mục lục NovelDetail và cuộn vô hạn — chính xác hơn danh sách ảo.
+ *
+ * Lưu ý: Supabase PostgREST giới hạn mặc định tối đa 1000 dòng mỗi request
+ * (`max_rows = 1000`), nên phải phân trang bằng `.range()` để lấy đủ các bộ
+ * truyện dài hàng nghìn chương.
  */
 export async function getSyncedNovelChapterList(key: string): Promise<ChapterMeta[]> {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('synced_chapters')
-    .select('chapter_number,title')
-    .eq('novel_id', key)
-    .order('chapter_number');
-  if (error) throw error;
-  return ((data ?? []) as { chapter_number: number; title: string }[]).map((r) => ({
+  const PAGE_SIZE = 1000;
+  const rows: { chapter_number: number; title: string }[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('synced_chapters')
+      .select('chapter_number,title')
+      .eq('novel_id', key)
+      .order('chapter_number', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as { chapter_number: number; title: string }[];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return rows.map((r) => ({
     number: r.chapter_number,
     title: r.title?.trim() ? r.title : `Chương ${r.chapter_number}`,
   }));
+}
+
+/**
+ * Gộp danh sách chương từ API và danh sách chương đã đồng bộ trong DB,
+ * đồng thời bù đủ các chương tới `totalExpected` để không bị cắt ở mốc 1000 chương
+ * hoặc khi truyện mới chỉ đồng bộ một phần trong DB.
+ */
+export function mergeChapterLists(
+  apiChapters: ChapterMeta[],
+  syncedChapters: ChapterMeta[],
+  totalExpected = 0,
+): ChapterMeta[] {
+  const map = new Map<number, string>();
+  for (const c of apiChapters) {
+    if (c.number > 0) map.set(c.number, c.title);
+  }
+  for (const c of syncedChapters) {
+    if (c.number > 0) map.set(c.number, c.title);
+  }
+  const maxExisting = map.size > 0 ? Math.max(...map.keys()) : 0;
+  const maxTotal = Math.max(totalExpected, maxExisting);
+  for (let n = 1; n <= maxTotal; n++) {
+    if (!map.has(n)) {
+      map.set(n, `Chương ${n}`);
+    }
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([number, title]) => ({ number, title }));
 }

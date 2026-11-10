@@ -59,14 +59,25 @@ async function fetchChapterFull(
 
 export async function getSyncedChapterNumbers(novelIdKey: string): Promise<number[]> {
   const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from('synced_chapters')
-    .select('chapter_number')
-    .eq('novel_id', novelIdKey);
-  if (error) throw error;
-  return ((data ?? []) as { chapter_number: number }[])
-    .map((r) => r.chapter_number)
-    .sort((a, b) => a - b);
+  const PAGE_SIZE = 1000;
+  const nums: number[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('synced_chapters')
+      .select('chapter_number')
+      .eq('novel_id', novelIdKey)
+      .order('chapter_number', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as { chapter_number: number }[];
+    for (const r of batch) nums.push(r.chapter_number);
+    if (batch.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return nums.sort((a, b) => a - b);
 }
 
 async function refreshNovelCounts(key: string): Promise<void> {

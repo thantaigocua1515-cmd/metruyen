@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { getSupabase } from '../lib/supabase';
 import { fetchNovelDetail } from '../lib/novelApi';
 import type { ApiSourceRow, NovelDetail as NovelDetailType } from '../lib/novelApi';
-import { getSyncedNovel, getSyncedNovelChapterList } from '../lib/library';
+import { getSyncedNovel, getSyncedNovelChapterList, mergeChapterLists } from '../lib/library';
 import { useAuth } from '../context/AuthContext';
 import ReaderView from '../components/ReaderView';
 import { updatePresenceReading } from '../lib/presence';
@@ -41,10 +41,17 @@ export default function Reader() {
     (async () => {
       if (!sourceId || !novelId) return;
       try {
+        const key = `${sourceId}:${novelId}`;
         if (sourceId === 'manual') {
-          const row = await getSyncedNovel(`${sourceId}:${novelId}`);
+          const row = await getSyncedNovel(key);
           if (!row) throw new Error('Không tìm thấy truyện.');
           const syncedList = await getSyncedNovelChapterList(row.id).catch(() => []);
+          const totalExpected = Math.max(
+            row.chapters_count ?? 0,
+            row.translated_count ?? 0,
+            syncedList.length,
+          );
+          const chapters = mergeChapterLists([], syncedList, totalExpected);
           const src: ApiSourceRow = {
             id: 'manual',
             name: 'Nhập tay',
@@ -60,11 +67,11 @@ export default function Reader() {
             author: row.author,
             description: row.description,
             coverUrl: row.cover_url,
-            chaptersCount: row.chapters_count,
-            translatedChaptersCount: row.translated_count,
+            chaptersCount: Math.max(row.chapters_count, chapters.length),
+            translatedChaptersCount: Math.max(row.translated_count, chapters.length),
             status: row.status,
             links: {},
-            chapters: syncedList,
+            chapters,
             chaptersVirtual: false,
           };
           if (alive) {
@@ -81,7 +88,41 @@ export default function Reader() {
           .single();
         if (sErr || !sRow) throw new Error('Không tìm thấy nguồn truyện.');
         const src = sRow as ApiSourceRow;
-        const d = await fetchNovelDetail(src, novelId);
+        const [syncedRow, syncedList] = await Promise.all([
+          getSyncedNovel(key).catch(() => null),
+          getSyncedNovelChapterList(key).catch(() => []),
+        ]);
+        let d: NovelDetailType;
+        try {
+          d = await fetchNovelDetail(src, novelId);
+        } catch (apiErr) {
+          if (!syncedRow) throw apiErr;
+          d = {
+            sourceId: src.id,
+            sourceName: src.name,
+            id: syncedRow.api_id,
+            title: syncedRow.title,
+            author: syncedRow.author,
+            description: syncedRow.description,
+            coverUrl: syncedRow.cover_url,
+            chaptersCount: syncedRow.chapters_count,
+            translatedChaptersCount: syncedRow.translated_count,
+            status: syncedRow.status,
+            links: {},
+            chapters: [],
+            chaptersVirtual: false,
+          };
+        }
+        const totalExpected = Math.max(
+          d.chaptersCount,
+          d.translatedChaptersCount,
+          syncedRow?.chapters_count ?? 0,
+          syncedRow?.translated_count ?? 0,
+          syncedList.length,
+        );
+        d.chapters = mergeChapterLists(d.chapters, syncedList, totalExpected);
+        d.chaptersCount = Math.max(d.chaptersCount, d.chapters.length);
+        d.translatedChaptersCount = Math.max(d.translatedChaptersCount, d.chapters.length);
         if (alive) {
           setSource(src);
           setDetail(d);
