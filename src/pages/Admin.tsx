@@ -5,7 +5,20 @@ import type { ApiSourceRow, NovelSummary } from '../lib/novelApi';
 import { syncNovelList, syncChapters, checkUpdates } from '../lib/sync';
 import { getSyncedNovels } from '../lib/library';
 import type { SyncedNovelRow } from '../lib/library';
-import { testGeminiKey, translateText, generateGeminiCover, getActiveKeys } from '../lib/translate';
+import {
+  testGeminiKey,
+  translateText,
+  generateGeminiCover,
+  getActiveKeys,
+  GEMINI_MODELS,
+  fetchAvailableGeminiModels,
+  getPreferredGeminiModel,
+  setPreferredGeminiModel,
+  getGeminiModelLabel,
+  getTranslationStyles,
+  type GeminiModelOption,
+  type TranslationStyleRow,
+} from '../lib/translate';
 import {
   getCloudflareConfig,
   saveCloudflareConfig,
@@ -1813,6 +1826,12 @@ function GeminiTab() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
+  const [models, setModels] = useState<GeminiModelOption[]>(GEMINI_MODELS);
+  const [selectedModel, setSelectedModel] = useState<string>(() => getPreferredGeminiModel());
+  const [scanningModels, setScanningModels] = useState(false);
+  const [testingModel, setTestingModel] = useState(false);
+  const [modelMsg, setModelMsg] = useState<string | null>(null);
+
   const loadKeys = async () => {
     try {
       const sb = getSupabase();
@@ -1825,7 +1844,48 @@ function GeminiTab() {
   };
   useEffect(() => {
     void loadKeys();
+    void fetchAvailableGeminiModels().then(setModels);
   }, []);
+
+  const handleSelectModel = (id: string) => {
+    setSelectedModel(id);
+    setPreferredGeminiModel(id);
+    setModelMsg(`✅ Đã chọn model mặc định: ${getGeminiModelLabel(id)}`);
+  };
+
+  const handleScanModels = async () => {
+    setScanningModels(true);
+    setModelMsg('🔍 Đang quét danh sách model từ Google AI Studio...');
+    try {
+      const list = await fetchAvailableGeminiModels();
+      setModels(list);
+      setModelMsg(`✅ Đã tải ${list.length} lựa chọn model khả dụng.`);
+    } catch (e) {
+      setModelMsg(`❌ ${e instanceof Error ? e.message : 'Quét model thất bại.'}`);
+    } finally {
+      setScanningModels(false);
+    }
+  };
+
+  const handleTestTranslateModel = async () => {
+    setTestingModel(true);
+    setModelMsg(`🧪 Đang dịch thử bằng ${getGeminiModelLabel(selectedModel)}...`);
+    try {
+      let usedModel = selectedModel;
+      const sample = '少年手握青锋古剑，独自踏入浩瀚无垠的修仙大道。';
+      const out = await translateText(sample, {
+        model: selectedModel,
+        onProgress: (_d, _t, used) => {
+          if (used) usedModel = used;
+        },
+      });
+      setModelMsg(`✅ [${usedModel}] Dịch thử thành công: "${out}"`);
+    } catch (e) {
+      setModelMsg(`❌ ${e instanceof Error ? e.message : 'Dịch thử thất bại.'}`);
+    } finally {
+      setTestingModel(false);
+    }
+  };
 
   const addKey = async () => {
     if (busy) return;
@@ -1901,6 +1961,80 @@ function GeminiTab() {
 
   return (
     <div className="space-y-4">
+      <div className={card}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="font-bold text-slate-900 dark:text-slate-100">
+              🧠 Chọn Model Gemini dịch truyện ({models.length} lựa chọn)
+            </p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Chọn model mặc định khi dịch ở tab 📝 Chương và ✍️ Nhập truyện. Khi một model hết quota,
+              hệ thống tự động xoay vòng qua các key và model dự phòng.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => void handleScanModels()}
+              disabled={scanningModels}
+              className={btnGhost}
+            >
+              {scanningModels ? '⏳ Đang quét...' : '🔄 Quét model từ API Key'}
+            </button>
+            <button
+              onClick={() => void handleTestTranslateModel()}
+              disabled={testingModel || keys.filter((k) => k.is_active).length === 0}
+              className={btnPrimary}
+            >
+              {testingModel ? '⏳ Đang dịch thử...' : '🧪 Dịch thử 1 câu'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          {models.map((m) => {
+            const active = selectedModel === m.id;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => handleSelectModel(m.id)}
+                className={`flex flex-col items-start rounded-xl border p-3 text-left transition ${
+                  active
+                    ? 'border-indigo-600 bg-indigo-50/80 ring-2 ring-indigo-600 dark:border-indigo-400 dark:bg-indigo-950/40'
+                    : 'border-slate-200 bg-white hover:border-indigo-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700'
+                }`}
+              >
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    {m.name}
+                  </span>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      active
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    {m.badge}
+                  </span>
+                </div>
+                <code className="mt-1 text-[11px] text-indigo-600 dark:text-indigo-400">
+                  {m.id}
+                </code>
+                <p className="mt-1.5 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
+                  {m.desc}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+        {modelMsg && (
+          <p className="mt-3 rounded-lg bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+            {modelMsg}
+          </p>
+        )}
+      </div>
+
       <div className={card}>
         <p className="font-bold text-slate-900 dark:text-slate-100">Thêm Gemini API key</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -2039,6 +2173,10 @@ function ImportTab() {
   // nhập chương
   const [selectedId, setSelectedId] = useState('');
   const [bulk, setBulk] = useState('');
+  const [models, setModels] = useState<GeminiModelOption[]>(GEMINI_MODELS);
+  const [modelId, setModelId] = useState<string>(() => getPreferredGeminiModel());
+  const [styles, setStyles] = useState<TranslationStyleRow[]>([]);
+  const [styleId, setStyleId] = useState('');
   const [busy, setBusy] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [transProgress, setTransProgress] = useState<string | null>(null);
@@ -2063,6 +2201,12 @@ function ImportTab() {
   };
   useEffect(() => {
     void loadNovels();
+    void fetchAvailableGeminiModels().then(setModels);
+    void getTranslationStyles().then((list) => {
+      setStyles(list);
+      const def = list.find((s) => s.is_default) ?? list[0];
+      if (def) setStyleId(def.id);
+    });
   }, []);
 
   const parsed = parseChapters(bulk);
@@ -2117,15 +2261,25 @@ function ImportTab() {
     setTranslating(true);
     setMsg(null);
     try {
+      const style = styles.find((s) => s.id === styleId);
+      let activeModel = modelId;
       const done: ParsedChapter[] = [];
       for (let i = 0; i < ps.length; i++) {
-        setTransProgress(`Đang dịch chương ${ps[i].num} (${i + 1}/${ps.length})...`);
-        const t = await translateText(ps[i].content);
+        setTransProgress(
+          `Đang dịch chương ${ps[i].num} (${i + 1}/${ps.length}) bằng ${getGeminiModelLabel(activeModel)}...`,
+        );
+        const t = await translateText(ps[i].content, {
+          model: modelId,
+          stylePrompt: style?.prompt,
+          onProgress: (_d, _t, used) => {
+            if (used) activeModel = used;
+          },
+        });
         done.push({ ...ps[i], content: t });
       }
       setBulk(formatChapters(done));
       setMsg(
-        `✅ Đã dịch xong ${done.length} chương — kiểm tra/sửa lại nội dung rồi bấm "💾 Lưu vào database".`,
+        `✅ Đã dịch xong ${done.length} chương bằng ${getGeminiModelLabel(activeModel)} — kiểm tra/sửa lại nội dung rồi bấm "💾 Lưu vào database".`,
       );
     } catch (e) {
       setMsg(`❌ ${e instanceof Error ? e.message : 'Dịch thất bại.'}`);
@@ -2261,6 +2415,44 @@ function ImportTab() {
           value={bulk}
           onChange={(e) => setBulk(e.target.value)}
         />
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+              Model Gemini dịch chương ({models.length})
+            </span>
+            <select
+              value={modelId}
+              onChange={(e) => {
+                setModelId(e.target.value);
+                setPreferredGeminiModel(e.target.value);
+              }}
+              className={inputCls}
+            >
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} [{m.badge}]
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+              Phong cách dịch
+            </span>
+            <select
+              value={styleId}
+              onChange={(e) => setStyleId(e.target.value)}
+              className={inputCls}
+            >
+              {styles.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                  {s.is_default ? ' (mặc định)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             onClick={() => void translateAll()}

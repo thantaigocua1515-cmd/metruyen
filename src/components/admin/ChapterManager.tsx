@@ -4,6 +4,12 @@ import { getSyncedNovelChapterList } from '../../lib/library';
 import {
   translateText,
   getTranslationStyles,
+  GEMINI_MODELS,
+  fetchAvailableGeminiModels,
+  getPreferredGeminiModel,
+  setPreferredGeminiModel,
+  getGeminiModelLabel,
+  type GeminiModelOption,
   type TranslationStyleRow,
 } from '../../lib/translate';
 import { getGlossary, applyGlossary, bumpUsage, addGlossaryTerm } from '../../lib/glossary';
@@ -41,6 +47,8 @@ export default function ChapterManager() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [engine, setEngine] = useState<'gemini' | 'glossary'>('gemini');
+  const [models, setModels] = useState<GeminiModelOption[]>(GEMINI_MODELS);
+  const [modelId, setModelId] = useState<string>(() => getPreferredGeminiModel());
   const [styles, setStyles] = useState<TranslationStyleRow[]>([]);
   const [styleId, setStyleId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -69,11 +77,15 @@ export default function ChapterManager() {
     })();
   }, []);
 
-  // Phong cách dịch
+  // Phong cách dịch + danh sách model Gemini
   useEffect(() => {
     (async () => {
-      const list = await getTranslationStyles();
+      const [list, availModels] = await Promise.all([
+        getTranslationStyles(),
+        fetchAvailableGeminiModels(),
+      ]);
       setStyles(list);
+      setModels(availModels);
       const def = list.find((s) => s.is_default) ?? list[0];
       if (def) setStyleId(def.id);
     })();
@@ -150,12 +162,19 @@ export default function ChapterManager() {
     try {
       if (engine === 'gemini') {
         const style = styles.find((s) => s.id === styleId);
+        let activeModel = modelId;
         const result = await translateText(content, {
+          model: modelId,
           stylePrompt: style?.prompt,
-          onProgress: (d, t) => setMsg(`🤖 Đang dịch đoạn ${d}/${t}…`),
+          onProgress: (d, t, used) => {
+            if (used) activeModel = used;
+            setMsg(`🤖 Đang dịch đoạn ${d}/${t} (${getGeminiModelLabel(used ?? modelId)})…`);
+          },
         });
         setContent(result);
-        setMsg(`✅ Đã dịch xong bằng Gemini (${style?.name ?? 'mặc định'}) — xem lại rồi bấm 💾 Lưu.`);
+        setMsg(
+          `✅ Đã dịch xong bằng ${getGeminiModelLabel(activeModel)} · Phong cách: ${style?.name ?? 'mặc định'} — xem lại rồi bấm 💾 Lưu.`,
+        );
       } else {
         const terms = await getGlossary(novelId);
         if (terms.length === 0) {
@@ -356,7 +375,7 @@ export default function ChapterManager() {
                   className={`${inputCls} font-mono leading-relaxed`}
                 />
               </label>
-              <div className="grid gap-2 md:grid-cols-2">
+              <div className="grid gap-2 md:grid-cols-3">
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
                     Engine dịch
@@ -366,26 +385,58 @@ export default function ChapterManager() {
                     onChange={(e) => setEngine(e.target.value as 'gemini' | 'glossary')}
                     className={inputCls}
                   >
-                    <option value="gemini">🤖 Gemini</option>
+                    <option value="gemini">🤖 Gemini AI</option>
                     <option value="glossary">📖 Từ điển tự học</option>
                   </select>
                 </label>
                 {engine === 'gemini' && (
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      Phong cách dịch
-                    </span>
-                    <select value={styleId} onChange={(e) => setStyleId(e.target.value)} className={inputCls}>
-                      {styles.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                          {s.is_default ? ' (mặc định)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        Model Gemini ({models.length})
+                      </span>
+                      <select
+                        value={modelId}
+                        onChange={(e) => {
+                          setModelId(e.target.value);
+                          setPreferredGeminiModel(e.target.value);
+                        }}
+                        className={inputCls}
+                      >
+                        {models.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} [{m.badge}]
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        Phong cách dịch
+                      </span>
+                      <select
+                        value={styleId}
+                        onChange={(e) => setStyleId(e.target.value)}
+                        className={inputCls}
+                      >
+                        {styles.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                            {s.is_default ? ' (mặc định)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
                 )}
               </div>
+              {engine === 'gemini' && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  💡 <strong>{models.find((m) => m.id === modelId)?.name ?? modelId}:</strong>{' '}
+                  {models.find((m) => m.id === modelId)?.desc ??
+                    'Model Gemini dùng để dịch chương hiện tại.'}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 <button onClick={() => void doTranslate()} disabled={busy} className={btnPrimary}>
                   {busy ? '…' : '🤖 Dịch nội dung hiện tại'}
