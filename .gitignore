@@ -1,0 +1,14 @@
+# local environment and secrets
+.env
+.env.*
+!.env.example
+
+# dependencies and build output
+node_modules/
+dist/
+node_modules/.tmp/
+
+# local tooling
+.vscode/
+.idea/
+*.local

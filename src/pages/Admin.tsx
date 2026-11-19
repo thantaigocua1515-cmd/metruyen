@@ -19,8 +19,9 @@ import type { CosmeticItem } from '../components/Treasury';
 import { useAuth } from '../context/AuthContext';
 import { useTemplate } from '../context/TemplateContext';
 import { TEMPLATES, getTemplateDef } from '../theme/templates';
+import CrawlerTab from '../components/admin/CrawlerTab';
 
-type Tab = 'overview' | 'users' | 'sources' | 'sync' | 'chapters' | 'glossary' | 'gemini' | 'import' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system' | 'announce';
+type Tab = 'overview' | 'users' | 'sources' | 'sync' | 'crawler' | 'chapters' | 'glossary' | 'gemini' | 'import' | 'thumbnails' | 'items' | 'defaults' | 'theme' | 'system' | 'announce';
 
 const card =
   'rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all dark:border-slate-800 dark:bg-slate-900';
@@ -2438,6 +2439,7 @@ const TAB_GROUPS: TabGroup[] = [
       { id: 'import', label: 'Nhập truyện thủ công', icon: '✍️', desc: 'Thêm truyện mới và nạp hàng loạt chương tự động' },
       { id: 'sources', label: 'Nguồn API Crawl', icon: '🔗', desc: 'Cấu hình OpenAPI nguồn truyện và máy chủ trung gian' },
       { id: 'sync', label: 'Đồng bộ dữ liệu', icon: '🔄', desc: 'Đồng bộ danh sách truyện và tải chương về database' },
+      { id: 'crawler', label: 'Crawler HTML', icon: '🕷️', desc: 'Inspect và crawl nguồn HTML được admin allowlist' },
       { id: 'glossary', label: 'Từ điển dịch thuật', icon: '📖', desc: 'Quy tắc thay thế thuật ngữ tu tiên và danh từ riêng' },
     ],
   },
@@ -2666,6 +2668,7 @@ export default function Admin() {
           {tab === 'users' && <UsersTab />}
           {tab === 'sources' && <SourcesTab />}
           {tab === 'sync' && <SyncTab />}
+          {tab === 'crawler' && <CrawlerTab />}
           {tab === 'chapters' && <ChapterManager />}
           {tab === 'glossary' && <GlossaryManager />}
           {tab === 'gemini' && <GeminiTab />}

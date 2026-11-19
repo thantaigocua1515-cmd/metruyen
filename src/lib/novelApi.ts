@@ -14,6 +14,7 @@ export interface ApiSourceRow {
   openapi_url: string;
   base_url: string | null;
   is_active: boolean;
+  source_type?: 'api' | 'crawler';
 }
 
 export interface NovelLinks {

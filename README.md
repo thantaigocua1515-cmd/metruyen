@@ -28,7 +28,27 @@ Frontend: Vite 6 + React 18 + TypeScript + Tailwind CSS v4.
 > Quyền truy cập thật do Row Level Security (RLS) trong `schema.sql` bảo vệ:
 > user chỉ đọc/ghi dữ liệu của mình, chỉ admin mới sửa cấu hình.
 
-## 2. Chạy web ở máy local
+## 2. Cấu hình an toàn trước khi chạy
+
+Nếu checkout cũ đã từng commit `.env`, hãy **rotate/revoke key cũ trong Supabase Dashboard** trước khi triển khai. Chỉ dùng publishable/anon key ở biến `VITE_SUPABASE_ANON_KEY`; tuyệt đối không đặt service-role key trong biến `VITE_*`.
+
+```bash
+cp .env.example .env
+# điền VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY
+```
+
+### Crawler HTML (admin-only)
+
+Crawler được tích hợp qua Supabase Edge Function, không đưa ứng dụng Next.js của `Crawler` vào bundle Vite. Để bật tính năng:
+
+1. Chạy `supabase/migration-crawler.sql` sau `supabase/schema.sql`.
+2. Deploy `supabase/functions/crawler-worker/index.ts` với `SUPABASE_URL` và `SUPABASE_SERVICE_ROLE_KEY` trong **Edge Function secrets**. Không đưa service-role key vào frontend.
+3. Trong Quản trị → **Crawler HTML**, tạo nguồn với hostname allowlist và selector tối thiểu; worker từ chối URL ngoài allowlist, hostname nội bộ, redirect, body quá lớn và quá 300 chương.
+4. Chỉ crawl nội dung bạn có quyền sử dụng và tuân thủ điều khoản/robots của nguồn. Worker không chuyển tiếp cookie, proxy hoặc cơ chế bypass Cloudflare/VIP.
+
+Job được lưu trong `crawler_jobs`, metadata/chương được upsert vào `synced_novels` và `synced_chapters`, và chỉ admin có thể đọc/ghi/hủy job theo RLS. Nếu Edge Function chưa deploy hoặc migration chưa chạy, tab crawler sẽ báo lỗi và không tự fallback sang fetch từ trình duyệt.
+
+## 3. Chạy web ở máy local
 
 ```bash
 cp .env.example .env
@@ -42,7 +62,7 @@ npm run build    # build production → thư mục dist/
 Đăng ký **tài khoản đầu tiên** — nó sẽ tự được set role **admin**
 (nhờ trigger `set_first_admin`).
 
-## 3. Deploy public
+## 4. Deploy public
 
 `npm run build` tạo thư mục `dist/` là static site thuần túy, deploy ở đâu cũng được:
 
@@ -54,7 +74,7 @@ npm run build    # build production → thư mục dist/
 
 Vì dùng HashRouter nên không cần cấu hình rewrite gì thêm — mở là chạy.
 
-## 4. Tính năng chính
+## 5. Tính năng chính
 
 - **Đọc truyện:** danh sách từ nhiều nguồn API, tìm kiếm, chi tiết + mục lục
   chương, **cuộn vô hạn tự nối chương tiếp theo**, tải EPUB, lưu tiến độ đọc.
@@ -75,7 +95,7 @@ Vì dùng HashRouter nên không cần cấu hình rewrite gì thêm — mở l�
   tặng sẵn cho tài khoản mới), **Giao diện** (chọn template), Hệ thống
   (trạng thái kết nối Supabase).
 
-## 5. Cấu trúc thư mục
+## 6. Cấu trúc thư mục
 
 ```
 supabase/schema.sql      schema Postgres đầy đủ (bảng + RLS + trigger + storage)
@@ -95,7 +115,7 @@ src/pages/               Home, NovelDetail, Reader, Bookshelf, Profile, UserProf
                          Search, Genres, Admin, Auth
 ```
 
-## 6. Template giao diện 🎨
+## 7. Template giao diện 🎨
 
 Web có 6 bộ skin, đổi trong **Quản trị → tab 🎨 Giao diện** (chỉ admin).
 Đổi là áp dụng **ngay lập tức cho toàn site** (lưu ở bảng `site_settings`,
@@ -121,7 +141,7 @@ realtime tới mọi máy đang mở web):
   riêng, rẽ nhánh theo `useTemplate()` trong component (xem `NovelCard`,
   `Navbar`, `Home` làm mẫu).
 
-## 7. Module Đồng bộ truyện 🔄
+## 8. Module Đồng bộ truyện 🔄
 
 Kéo truyện từ API nguồn về database Supabase của mình để web tự chủ dữ liệu
 (đọc nhanh hơn, không phụ thuộc API, mục lục chính xác bằng tiêu đề chương
@@ -209,7 +229,7 @@ grant all on public.sync_jobs to authenticated;
 alter publication supabase_realtime add table public.sync_jobs;
 ```
 
-## 8. Gemini API keys & Nhập truyện thủ công 🤖✍️
+## 9. Gemini API keys & Nhập truyện thủ công 🤖✍️
 
 **Tab 🤖 Gemini — quản lý key dịch thuật:**
 - Lấy key miễn phí tại Google AI Studio (aistudio.google.com) → nhập tên gợi nhớ
@@ -248,7 +268,7 @@ alter publication supabase_realtime add table public.sync_jobs;
 - Truyện manual đọc được ngay trên web (Home/Detail/Reader đều đọc DB-first);
   `checkUpdates` bỏ qua nguồn manual.
 
-## 9. Sửa chương, phong cách dịch & Từ điển tự học 📝📖
+## 10. Sửa chương, phong cách dịch & Từ điển tự học 📝📖
 
 **Tổng số chương thực tế:** một số truyện API báo `translated_count=0` nhưng
 endpoint chương vẫn trả nội dung đầy đủ. Sync (cả tab Đồng bộ foreground lẫn
@@ -281,7 +301,7 @@ SQL 1 lần trên Supabase live (xem mục 1).
 **Lưu ý:** chỉ nhập/dịch nội dung bạn có quyền sử dụng. Không có chức năng cào
 web tự động.
 
-## 10. Thumbnail AI: Gemini + Cloudflare dự phòng
+## 11. Thumbnail AI: Gemini + Cloudflare dự phòng
 
 - Nút **✨ Tạo bằng AI** (tab 🖼️ Thumbnails): thử **Gemini** (`gemini-3.1-flash-image`) trước;
   nếu lỗi/hết quota thì tự chuyển sang **Cloudflare Workers AI** (FLUX.1-schnell, miễn phí
